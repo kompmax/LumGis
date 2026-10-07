@@ -1,7 +1,7 @@
 @echo off
 title Leuchten GIS Dashboard
 echo ============================================
-echo   Leuchten GIS Dashboard v4.0
+echo   Leuchten GIS Dashboard v4.2
 echo ============================================
 echo.
 

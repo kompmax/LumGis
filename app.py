@@ -1,6 +1,6 @@
 """
-Leuchten GIS Dashboard v4.1
-Lichtplanungsbuero - Inventar-Viewer & Editor
+Leuchten GIS Dashboard v4.2
+Lichtplanungsbuero - Inventar-Viewer (nur Ansicht)
 """
 
 import io
@@ -11,7 +11,6 @@ import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime
 
-import openpyxl
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -345,7 +344,9 @@ def _read_data(filepath, headers, hidden_rows):
             f"Vorhandene Blaetter: {', '.join(wb.sheet_names)}"
         )
 
-    all_rows = wb.get_sheet_by_name(SHEET_NAME).to_python()
+    # skip_empty_area=False: Raster beginnt bei A1. Standardmaessig schneidet calamine
+    # leere Randzeilen/-spalten ab, dann waeren Zeilen- und Spaltenindizes verschoben.
+    all_rows = wb.get_sheet_by_name(SHEET_NAME).to_python(skip_empty_area=False)
 
     data_rows = []
     for row_num, row_tuple in enumerate(
@@ -357,6 +358,14 @@ def _read_data(filepath, headers, hidden_rows):
         has_value = False
         for c, header in zip(col_indices, header_list):
             val = row_tuple[c - 1] if c - 1 < len(row_tuple) else None
+            if val == "":
+                val = None
+            elif isinstance(val, float) and val.is_integer():
+                # Excel speichert Ganzzahlen als float -> "30" statt "30.0".
+                # Direkt als Text, sonst macht pandas gemischte Spalten wieder zu float.
+                val = str(int(val))
+            elif val is not None:
+                val = str(val)
             row_data[header] = val
             if val is not None:
                 has_value = True
@@ -416,36 +425,6 @@ def read_excel_structure(filepath, file_mtime):
     df = _add_coordinates(df)
 
     return df, cat_map, ordered_categories, col_info
-
-
-# -----------------------------------------------
-# EXCEL SPEICHERN
-# -----------------------------------------------
-def save_excel_data(filepath, changed_cells, col_info):
-    is_xlsm = filepath.lower().endswith(".xlsm")
-    wb = openpyxl.load_workbook(filepath, keep_vba=is_xlsm, data_only=False)
-    try:
-        ws = wb[SHEET_NAME]
-        for (excel_row, col_name), new_value in changed_cells.items():
-            if col_name not in col_info:
-                continue
-            col_idx = col_info[col_name]["col_index"]
-            cell = ws.cell(row=excel_row, column=col_idx)
-            if new_value is None or str(new_value).strip() == "":
-                cell.value = None
-            else:
-                try:
-                    float_val = float(new_value)
-                    cell.value = (
-                        int(float_val)
-                        if float_val == int(float_val) and "." not in str(new_value)
-                        else float_val
-                    )
-                except (ValueError, TypeError):
-                    cell.value = str(new_value)
-        wb.save(filepath)
-    finally:
-        wb.close()
 
 
 # -----------------------------------------------
@@ -565,21 +544,9 @@ def build_color_map(series):
 # -----------------------------------------------
 @st.cache_data(show_spinner="Karte wird erstellt ...")
 def build_map_html(
-    _lats, _lons, _ids, _streets, _colors, _cat_vals, _popup_rows,
-    color_col, color_map_json, center_lat, center_lon, zoom,
+    markers_json, color_col, color_map_json, center_lat, center_lon, zoom,
 ):
-    markers_json = json.dumps(
-        [
-            {
-                "lat": lat, "lon": lon, "id": mid, "street": street,
-                "color": color, "catVal": cat_val, "fields": popup,
-            }
-            for lat, lon, mid, street, color, cat_val, popup
-            in zip(_lats, _lons, _ids, _streets, _colors, _cat_vals, _popup_rows)
-        ],
-        ensure_ascii=False,
-    )
-
+    # Alle Parameter sind Teil des Cache-Schluessels (markers_json enthaelt die gefilterten Punkte)
     html = f"""<!DOCTYPE html>
 <html><head>
     <meta charset="utf-8">
@@ -761,11 +728,13 @@ def prepare_map_data(df, color_col):
 
     lats = tuple(valid["_lat"].astype(float).tolist())
     lons = tuple(valid["_lon"].astype(float).tolist())
-    ids = (
-        tuple(valid[ID_COL].fillna("-").tolist())
-        if ID_COL in valid.columns
-        else ("-",) * len(valid)
-    )
+    # Titel im Popup: erste vorhandene der drei ID-Spalten
+    id_series = pd.Series("", index=valid.index)
+    for c in (ID_COL_PROJEKT, ID_COL_NEU, ID_COL):
+        if c in valid.columns:
+            val = valid[c].str.strip()
+            id_series = val.where(~val.isin(EMPTY_VALS), id_series)
+    ids = tuple(id_series.replace("", "-").tolist())
     streets = (
         tuple(valid[STREET_COL].fillna("").tolist())
         if STREET_COL in valid.columns
@@ -792,19 +761,33 @@ def prepare_map_data(df, color_col):
     records = valid[display_cols].to_dict("records")
     popup_rows = tuple(
         {
-            k: str(v)
-            for k, v in rec.items()
-            if pd.notna(v) and str(v).strip() not in EMPTY_VALS
+            "Excel-Zeile": str(int(excel_row)),
+            **{
+                k: str(v)
+                for k, v in rec.items()
+                if pd.notna(v) and str(v).strip() not in EMPTY_VALS
+            },
         }
-        for rec in records
+        for excel_row, rec in zip(valid["_excel_row"], records)
+    )
+
+    markers_json = json.dumps(
+        [
+            {
+                "lat": lat, "lon": lon, "id": mid, "street": street,
+                "color": color, "catVal": cat_val, "fields": popup,
+            }
+            for lat, lon, mid, street, color, cat_val, popup
+            in zip(lats, lons, ids, streets, colors, cat_vals, popup_rows)
+        ],
+        ensure_ascii=False,
     )
 
     center_lat = sum(lats) / len(lats)
     center_lon = sum(lons) / len(lons)
 
     return {
-        "lats": lats, "lons": lons, "ids": ids, "streets": streets,
-        "colors": colors, "cat_vals": cat_vals, "popup_rows": popup_rows,
+        "markers_json": markers_json,
         "color_col": color_col,
         "color_map_json": json.dumps(color_map, ensure_ascii=False),
         "center_lat": center_lat, "center_lon": center_lon, "zoom": 14,
@@ -890,6 +873,13 @@ if "df" not in st.session_state:
         df, cat_map, ordered_categories, col_info = read_excel_structure(
             filepath, os.path.getmtime(filepath)
         )
+        id_cols_found = [c for c in (ID_COL, ID_COL_NEU, ID_COL_PROJEKT) if c in col_info]
+        if not id_cols_found:
+            raise ValueError(
+                f"Keine ID-Spalte in Zeile {HEADER_ROW} gefunden "
+                f"(erwartet: '{ID_COL}', '{ID_COL_NEU}' oder '{ID_COL_PROJEKT}'). "
+                f"Gefundene Spalten: {', '.join(col_info) or 'keine'}"
+            )
         st.session_state.df = df
         st.session_state.cat_map = cat_map
         st.session_state.ordered_categories = ordered_categories
@@ -973,10 +963,13 @@ with st.sidebar:
 
     search = st.text_input("Suche (Strasse / Lichtpunkt-Nr.)", "")
     if search:
-        s = search.lower()
-        s_street = df[STREET_COL].str.lower() if STREET_COL in df.columns else pd.Series("", index=df.index)
-        s_id = df[ID_COL].str.lower() if ID_COL in df.columns else pd.Series("", index=df.index)
-        mask &= s_street.str.contains(s, na=False) | s_id.str.contains(s, na=False)
+        s = search.strip().lower()
+        search_cols = [c for c in (STREET_COL, ID_COL, ID_COL_NEU, ID_COL_PROJEKT) if c in df.columns]
+        hit = pd.Series(False, index=df.index)
+        for c in search_cols:
+            # regex=False: Eingaben wie "(" oder "[" sind normaler Text
+            hit |= df[c].str.lower().str.contains(s, regex=False, na=False)
+        mask &= hit
 
     filtered = df[mask]
 
@@ -984,15 +977,23 @@ with st.sidebar:
     valid_count = int(filtered["_lat"].notna().sum())
     st.caption(f"**{len(filtered)}** Leuchten | **{valid_count}** mit Koordinaten")
 
-    if st.button("Export (gefiltert)", use_container_width=True):
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        export_path = os.path.join(os.path.dirname(filepath), f"export_{ts}.xlsx")
-        try:
-            export_df = filtered[[c for c in filtered.columns if not c.startswith("_")]]
-            export_df.to_excel(export_path, index=False, sheet_name=SHEET_NAME)
-            st.success(f"Gespeichert: {export_path}")
-        except Exception as e:
-            st.error(f"Export fehlgeschlagen: {e}")
+    def _export_bytes(data=filtered):
+        buf = io.BytesIO()
+        data[[c for c in data.columns if not c.startswith("_")]].to_excel(
+            buf, index=False, sheet_name=SHEET_NAME
+        )
+        return buf.getvalue()
+
+    _src_name = os.path.splitext(os.path.basename(filepath))[0]
+    st.download_button(
+        "Export (gefiltert)",
+        data=_export_bytes,
+        file_name=f"{_src_name}_export_{datetime.now():%Y%m%d_%H%M}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        on_click="ignore",
+        use_container_width=True,
+        help="Laedt die gefilterten Leuchten als Excel-Datei herunter (Download-Ordner).",
+    )
 
 
 # --- HAUPTBEREICH ---
@@ -1004,11 +1005,14 @@ m1.metric("Leuchten gesamt", len(df))
 m2.metric("Gefiltert", len(filtered))
 m3.metric("Mit Koordinaten", valid_count)
 
+st.caption(
+    "Nur Ansicht – Aenderungen bitte direkt in Excel vornehmen und danach "
+    "in der Seitenleiste «Daten neu laden» klicken."
+)
+
 st.markdown("---")
 
-tab_map, tab_table, tab_edit, tab_debug = st.tabs(
-    ["Karte", "Tabelle", "Bearbeiten", "Diagnose"]
-)
+tab_map, tab_table, tab_debug = st.tabs(["Karte", "Tabelle", "Diagnose"])
 
 # -- TAB: KARTE --
 with tab_map:
@@ -1017,113 +1021,18 @@ with tab_map:
     else:
         map_data = prepare_map_data(filtered, color_col)
         if map_data:
-            map_html = build_map_html(
-                _lats=map_data["lats"], _lons=map_data["lons"],
-                _ids=map_data["ids"], _streets=map_data["streets"],
-                _colors=map_data["colors"], _cat_vals=map_data["cat_vals"],
-                _popup_rows=map_data["popup_rows"],
-                color_col=map_data["color_col"],
-                color_map_json=map_data["color_map_json"],
-                center_lat=map_data["center_lat"],
-                center_lon=map_data["center_lon"],
-                zoom=map_data["zoom"],
-            )
+            map_html = build_map_html(**map_data)
             components.html(map_html, height=860, scrolling=False)
 
 # -- TAB: TABELLE --
 with tab_table:
     display_cols = [c for c in filtered.columns if not c.startswith("_")]
     st.dataframe(
-        filtered[display_cols].reset_index(drop=True),
+        filtered[["_excel_row"] + display_cols].rename(columns={"_excel_row": "Excel-Zeile"}),
         use_container_width=True,
         height=520,
+        hide_index=True,
     )
-
-# -- TAB: BEARBEITEN --
-with tab_edit:
-    st.markdown("#### Leuchte bearbeiten")
-
-    edit_id_options = (
-        sorted(
-            [v for v in df[ID_COL].dropna().unique() if str(v).strip() not in EMPTY_VALS],
-            key=str,
-        )
-        if ID_COL in df.columns
-        else []
-    )
-
-    if not edit_id_options:
-        st.warning(f"ID-Spalte '{ID_COL}' nicht gefunden oder leer.")
-    else:
-        selected_edit_id = st.selectbox("Leuchte waehlen", edit_id_options, key="edit_select_id")
-        row_index = df[df[ID_COL] == selected_edit_id].index
-
-        if len(row_index) > 0:
-            idx = row_index[0]
-            row = df.loc[idx]
-            excel_row = int(row["_excel_row"])
-
-            street_val = str(row.get(STREET_COL, ""))
-            if street_val in EMPTY_VALS:
-                street_val = ""
-            st.markdown(f"**{selected_edit_id}** - {street_val}  (Excel-Zeile {excel_row})")
-            st.markdown("---")
-
-            edited = {}
-
-            for cat in ordered_categories:
-                cat_cols = cols_by_cat.get(cat, [])
-                if not cat_cols:
-                    continue
-                with st.expander(f"{cat}", expanded=True):
-                    for i in range(0, len(cat_cols), 2):
-                        c1, c2 = st.columns(2)
-                        for col, widget_col in zip(cat_cols[i: i + 2], [c1, c2]):
-                            if col not in df.columns:
-                                continue
-                            cur = str(row.get(col, ""))
-                            if cur in EMPTY_VALS:
-                                cur = ""
-                            # Use col_index as key component to avoid collisions on special chars
-                            key_id = col_info[col]["col_index"]
-                            edited[col] = widget_col.text_input(
-                                col, value=cur, key=f"ed_{key_id}_{idx}",
-                            )
-
-            st.markdown("---")
-            col_btn, col_hint = st.columns([1, 4])
-            with col_btn:
-                save = st.button("Speichern", type="primary")
-            with col_hint:
-                st.caption(f"Aenderungen werden in **{os.path.basename(filepath)}** geschrieben.")
-
-            if save:
-                changed_cells = {}
-                for col, new_val in edited.items():
-                    old_val = str(row.get(col, ""))
-                    if old_val in EMPTY_VALS:
-                        old_val = ""
-                    if new_val != old_val:
-                        changed_cells[(excel_row, col)] = new_val if new_val.strip() != "" else None
-
-                if not changed_cells:
-                    st.info("Keine Aenderungen erkannt.")
-                else:
-                    try:
-                        save_excel_data(filepath, changed_cells, col_info)
-
-                        for (_, col_name), val in changed_cells.items():
-                            st.session_state.df.at[idx, col_name] = val if val else ""
-
-                        if any(c in COORD_COLS for _, c in changed_cells.keys()):
-                            _add_coordinates(st.session_state.df)
-
-                        st.cache_data.clear()
-                        st.success(f"{len(changed_cells)} Feld(er) gespeichert!")
-                    except PermissionError:
-                        st.error("Datei ist gesperrt - bitte in Excel schliessen und nochmals versuchen.")
-                    except Exception as e:
-                        st.error(f"Fehler beim Speichern: {e}")
 
 # -- TAB: DIAGNOSE --
 with tab_debug:

@@ -11,36 +11,41 @@ streamlit run app.py --server.headless false --browser.gatherUsageStats false
 
 Alternatively, double-click `START.bat` on Windows (auto-installs dependencies).
 
-There are no tests, linting, or build steps — this is a single-file Streamlit application.
+## Tests
+
+```bash
+python tests/test_app.py
+```
+
+No pytest needed. The script generates Excel test files in a temp folder (Excel files are git-ignored) and drives the app via Streamlit's `AppTest`. Covers layouts (A1 empty / content only from A15 / column A completely empty), hidden rows/columns, number formatting, LV95 parsing variants, search with special characters, missing ID columns.
 
 ## What This App Does
 
-**Leuchten GIS Dashboard** — a Streamlit tool for viewing and editing lighting fixture (Leuchten) inventory data stored in Excel files (.xlsx/.xlsm). The UI is entirely in German.
+**Leuchten GIS Dashboard (LumGis)** — a read-only Streamlit viewer for lighting fixture (Leuchten) inventories stored in Excel files (.xlsx/.xlsm). UI is entirely in German. Editing was removed on purpose (v4.2): changes are made in Excel, then "Daten neu laden".
 
-## Architecture (app.py)
+## Roadmap
 
-The entire application lives in `app.py` (~960 lines). Key sections in order:
+The Streamlit app is being kept as the **reference implementation**. Planned successor: a single self-contained HTML file (`LumGis.html`, SheetJS + Leaflet + proj4js inlined, no installation). Before switching, a parity test must show both parsers produce identical results on real Lp files. Do not read or write anything on network drives (R:\, A:\) — real test files must be provided locally by the user.
 
-1. **Constants (lines ~20-44)**: Excel layout constants — the app expects a specific sheet structure with categories in row 53, headers in row 55, data starting at row 56 in the sheet named "Lp".
+## Architecture (app.py, single file)
 
-2. **Coordinate conversion (lines ~50-85)**: Converts Swiss LV95 (EPSG:2056) coordinates to WGS84 using pyproj. Batch-converts using vectorised operations.
+1. **Constants**: sheet `Lp`, categories in row 53 (merged cells), headers in row 55, data from row 56. Columns are located by **header name**, never by letter. Coordinate columns: `Koordinate X` / `Koordinate Y` (LV95); legacy `GPS Koordinaten (Breite, Länge)` as fallback.
 
-3. **Two-pass Excel reading (lines ~91-241)**:
-   - **Pass 1 (`_read_structure`)**: Uses openpyxl in normal mode to read merged cells (categories), headers, hidden columns/rows — metadata that calamine cannot access.
-   - **Pass 2 (`_read_data`)**: Uses python-calamine (Rust-based) for fast data extraction (10-30x faster than openpyxl for bulk cell reads).
+2. **Coordinates**: LV95 → WGS84 via pyproj (only needed for Leaflet). E/N are assigned per row by value range (E 2.4–2.9 M, N 1.0–1.4 M), so swapped X/Y works. Accepts thousands apostrophes and decimal commas. Legacy column auto-detects WGS84 vs. LV95.
 
-4. **Excel writing (`save_excel_data`, lines ~247-271)**: Writes changed cells back to Excel via openpyxl, preserving VBA macros in .xlsm files.
+3. **Two-pass Excel reading**:
+   - **Pass 1 (`_read_structure`)**: parses the sheet XML directly from the ZIP (no openpyxl) for merged cells, headers, hidden columns/rows.
+   - **Pass 2 (`_read_data`)**: python-calamine for bulk data. Must use `to_python(skip_empty_area=False)` — otherwise calamine trims leading empty rows/columns and all indices shift silently. All values are converted to text here (integral floats → `"30"`, not `"30.0"`).
 
-5. **File browser (`render_file_selector`, lines ~277-375)**: OS-level directory browser with quick-access to Windows network drives (R:\, A:\).
+4. **File browser (`render_file_selector`)**: OS-level directory browser with quick-access drive buttons.
 
-6. **Leaflet map (lines ~389-601)**: Generates a self-contained HTML page with Leaflet.js markers, popups, color legend with live color pickers. Cached via `@st.cache_data`.
+5. **Leaflet map (`prepare_map_data` / `build_map_html`)**: self-contained HTML with markers, lazy popups (incl. Excel row), live color pickers in the legend. `build_map_html` is `@st.cache_data`-cached; all marker data goes in as `markers_json` so it is part of the cache key.
 
-7. **Streamlit UI (lines ~624-957)**: Sidebar with filters/search, four tabs: Karte (map), Tabelle (data table), Bearbeiten (edit single fixture), Diagnose (debug info).
+6. **Streamlit UI**: sidebar with color coding, category filters, search (street + all three ID columns, plain substring, `regex=False`), export as browser download (deferred callable, never written next to the source file). Tabs: Karte, Tabelle (with Excel row), Diagnose (found columns, unparseable coordinate rows).
 
 ## Key Design Decisions
 
-- **Two-pass read strategy**: openpyxl is needed for structure metadata (merged cells, hidden columns); calamine handles bulk data for performance.
-- **Session state**: Loaded data (`df`, `cat_map`, `col_info`, etc.) is stored in `st.session_state` to avoid re-reading Excel on every Streamlit rerun.
-- **Map caching**: `build_map_html` is cached with `@st.cache_data`; cache is cleared on data edits.
-- **Internal columns**: `_lat`, `_lon`, `_excel_row`, `_hidden_row` are prefixed with `_` and excluded from display/export.
-- **ID columns**: Three ID columns exist (`Lichtpunkt-Nr.`, `Lichtpunkt-Nr. neu`, `Lichtpunkt-Nr. Projekt`); rows are dropped only if all three are empty.
+- **Read-only**: no write access to the source Excel at all.
+- **Session state**: loaded data (`df`, `cat_map`, `col_info`, …) lives in `st.session_state`; loading aborts with a clear message if none of the ID columns exists.
+- **Internal columns**: `_lat`, `_lon`, `_excel_row` are prefixed with `_` and excluded from display/export.
+- **ID columns**: `Lichtpunkt-Nr.`, `Lichtpunkt-Nr. neu`, `Lichtpunkt-Nr. Projekt`; a row is dropped only if all three are empty. Marker titles use the first non-empty one.
