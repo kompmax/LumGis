@@ -41,11 +41,11 @@ The Streamlit app is being kept as the **reference implementation**. Planned suc
 
 5. **Leaflet map (`prepare_map_data` / `build_map_html`)**: self-contained HTML with markers, lazy popups (incl. Excel row), live color pickers in the legend. `build_map_html` is `@st.cache_data`-cached; all marker data goes in as `markers_json` so it is part of the cache key.
 
-6. **Streamlit UI**: sidebar with color coding, category filters, search (street + all three ID columns, plain substring, `regex=False`), export as browser download (deferred callable, never written next to the source file). Tabs: Karte, Tabelle (with Excel row), Diagnose (found columns, unparseable coordinate rows).
+6. **Streamlit UI**: sidebar with color coding, category filters, search (street + all three ID columns, plain substring, `regex=False`). No export (removed in v4.2; lists are filtered in Excel). Tabs: Karte, Tabelle (with Excel row), Diagnose (found columns, unparseable coordinate rows).
 
 ## Key Design Decisions
 
 - **Read-only**: no write access to the source Excel at all.
 - **Session state**: loaded data (`df`, `cat_map`, `col_info`, …) lives in `st.session_state`; loading aborts with a clear message if none of the ID columns exists.
-- **Internal columns**: `_lat`, `_lon`, `_excel_row` are prefixed with `_` and excluded from display/export.
+- **Internal columns**: `_lat`, `_lon`, `_excel_row` are prefixed with `_` and excluded from display.
 - **ID columns**: `Lichtpunkt-Nr.`, `Lichtpunkt-Nr. neu`, `Lichtpunkt-Nr. Projekt`; a row is dropped only if all three are empty. Marker titles use the first non-empty one.

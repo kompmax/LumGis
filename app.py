@@ -9,7 +9,6 @@ import os
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -976,24 +975,6 @@ with st.sidebar:
     st.markdown("---")
     valid_count = int(filtered["_lat"].notna().sum())
     st.caption(f"**{len(filtered)}** Leuchten | **{valid_count}** mit Koordinaten")
-
-    def _export_bytes(data=filtered):
-        buf = io.BytesIO()
-        data[[c for c in data.columns if not c.startswith("_")]].to_excel(
-            buf, index=False, sheet_name=SHEET_NAME
-        )
-        return buf.getvalue()
-
-    _src_name = os.path.splitext(os.path.basename(filepath))[0]
-    st.download_button(
-        "Export (gefiltert)",
-        data=_export_bytes,
-        file_name=f"{_src_name}_export_{datetime.now():%Y%m%d_%H%M}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        on_click="ignore",
-        use_container_width=True,
-        help="Laedt die gefilterten Leuchten als Excel-Datei herunter (Download-Ordner).",
-    )
 
 
 # --- HAUPTBEREICH ---
