@@ -316,9 +316,9 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
 <script>/*
  * LumGis Kern: Excel lesen, Koordinaten, Pruefbericht.
  *
- * Bildet die Leselogik von app.py 1:1 nach (Referenzimplementierung).
+ * Bildet die Leselogik von archiv/streamlit/app.py 1:1 nach (Referenzimplementierung).
  * Fuer dieselbe Datei muessen beide dieselbe Pruefsumme liefern — bei
- * Aenderungen hier immer auch app.py anpassen und tests/test_parity.py laufen lassen.
+ * Aenderungen hier immer auch archiv/streamlit/app.py anpassen und tests/test_parity.py laufen lassen.
  *
  * Laeuft im Browser (window.LumGisCore) und in Node (require) fuer die Tests.
  */
@@ -1142,7 +1142,7 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
 
     $("report").innerHTML = `
       <h2>Prüfbericht</h2>
-      <p class="muted">Dieselbe Datei muss im Python-Tool (app.py) dieselbe Prüfsumme ergeben.</p>
+      <p class="muted">Gleiche Prüfsumme bedeutet gleicher Datenstand. Ändert sich eine einzige Zelle, ändert sich die Prüfsumme.</p>
       <div>Prüfsumme</div><div class="checksum">${rep.checksum}</div>
       <table class="kv">${kv.map(([k, v]) => `<tr><td>${k}</td><td>${fmtCount(v)}</td></tr>`).join("")}</table>
       ${invalid.length ? `<details open><summary>Koordinaten nicht lesbar (${fmtCount(invalid.length)})</summary><div>
@@ -1159,7 +1159,7 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
           .map(([c, i]) => `${colLetter(i.colIndex)}: ${esc(c)}`).join(", ")}</p>`).join("")}
       </div></details>
       <details><summary>Details für den Vergleich</summary><div>
-        <p class="muted">Liste aller gelesenen Werte (Tab-getrennt). Bei abweichender Prüfsumme mit der Liste aus app.py vergleichen.</p>
+        <p class="muted">Liste aller gelesenen Werte (Tab-getrennt), z. B. um zwei Datenstände zu vergleichen.</p>
         <button class="copy" id="btnCopy">In die Zwischenablage kopieren</button> <span id="copyMsg" class="muted"></span>
       </div></details>`;
   }

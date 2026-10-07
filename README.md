@@ -10,15 +10,14 @@ Erwartetes Excel-Layout: Blatt `Lp`, Kategorien in Zeile 53, Spaltenüberschrift
 
 Kurzanleitung: [docs/Anleitung.pdf](docs/Anleitung.pdf).
 
-## Python-Version (nur Referenz)
+## Archiv
 
-`app.py` / `START.bat` ist die frühere Streamlit-Version und wird seit Oktober 2026 nicht mehr im Alltag genutzt. Sie bleibt im Repo als Referenz: `tests/test_parity.py` prüft, dass beide Versionen jede Datei identisch lesen (gleiche Prüfsumme).
+`archiv/streamlit/` enthält die frühere Python/Streamlit-Version (bis Oktober 2026). Sie bleibt als Referenz: `tests/test_parity.py` prüft, dass beide Versionen jede Datei identisch lesen (gleiche Prüfsumme).
 
 ## Entwicklung
 
 ```bash
 python web/build.py           # LumGis.html aus web/src bauen
-python tests/test_app.py      # Tests Python-Referenz
 python tests/test_parity.py   # Python und HTML lesen identisch (braucht Node.js)
 python docs/anleitung_pdf.py docs/Anleitung.md --logo web/assets/luminum_logo.png --fusszeile "LumGis 1.0.1 – Kurzanleitung · Luminum GmbH"
 ```

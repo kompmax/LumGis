@@ -1,7 +1,7 @@
 """
 Regressionstests fuer app.py — ohne pytest lauffaehig:
 
-    python tests/test_app.py
+    python archiv/streamlit/test_app.py
 
 Erzeugt Testdateien in einem Temp-Ordner (Excel-Dateien sind per .gitignore
 ausgeschlossen) und faehrt die App mit Streamlits AppTest durch.
@@ -19,7 +19,7 @@ from streamlit.testing.v1 import AppTest
 warnings.filterwarnings("ignore")
 logging.disable(logging.WARNING)
 
-APP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app.py")
+APP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")
 
 HEADERS = {
     2: "Lichtpunkt-Nr.", 3: "Lichtpunkt-Nr. neu", 4: "Lichtpunkt-Nr. Projekt",

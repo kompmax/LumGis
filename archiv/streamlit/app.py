@@ -452,7 +452,7 @@ REPORT_VERSION = "LumGis-Pruefsumme v1"
 
 
 def build_report(df, n_hidden_rows, n_hidden_cols, n_no_id):
-    """Kennzahlen + Pruefsumme. Identisch zu buildReport() in web/src/core.js —
+    """Kennzahlen + Pruefsumme. Identisch zu buildReport() in web/src/core.js (Repo-Hauptordner) —
     beide Tools muessen fuer dieselbe Datei dieselbe Pruefsumme liefern."""
     data_cols = [c for c in df.columns if not c.startswith("_")]
     lines = [REPORT_VERSION, "\t".join(data_cols)]

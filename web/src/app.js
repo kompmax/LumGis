@@ -444,7 +444,7 @@
 
     $("report").innerHTML = `
       <h2>Prüfbericht</h2>
-      <p class="muted">Dieselbe Datei muss im Python-Tool (app.py) dieselbe Prüfsumme ergeben.</p>
+      <p class="muted">Gleiche Prüfsumme bedeutet gleicher Datenstand. Ändert sich eine einzige Zelle, ändert sich die Prüfsumme.</p>
       <div>Prüfsumme</div><div class="checksum">${rep.checksum}</div>
       <table class="kv">${kv.map(([k, v]) => `<tr><td>${k}</td><td>${fmtCount(v)}</td></tr>`).join("")}</table>
       ${invalid.length ? `<details open><summary>Koordinaten nicht lesbar (${fmtCount(invalid.length)})</summary><div>
@@ -461,7 +461,7 @@
           .map(([c, i]) => `${colLetter(i.colIndex)}: ${esc(c)}`).join(", ")}</p>`).join("")}
       </div></details>
       <details><summary>Details für den Vergleich</summary><div>
-        <p class="muted">Liste aller gelesenen Werte (Tab-getrennt). Bei abweichender Prüfsumme mit der Liste aus app.py vergleichen.</p>
+        <p class="muted">Liste aller gelesenen Werte (Tab-getrennt), z. B. um zwei Datenstände zu vergleichen.</p>
         <button class="copy" id="btnCopy">In die Zwischenablage kopieren</button> <span id="copyMsg" class="muted"></span>
       </div></details>`;
   }

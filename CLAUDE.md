@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **LumGis** — read-only viewer for lighting fixture (Leuchten) inventories stored in Excel files (.xlsx/.xlsm). UI entirely in German. Two implementations that must read files **identically**:
 
-| | `LumGis.html` (successor) | `app.py` (reference) |
+| | `LumGis.html` | `archiv/streamlit/app.py` (reference) |
 |---|---|---|
 | Tech | single self-contained HTML, no install | Streamlit (Python) |
-| Source | `web/src/` → built by `web/build.py` | `app.py` |
+| Source | `web/src/` → built by `web/build.py` | `archiv/streamlit/app.py` |
 | Status | in daily use (v1.0.1) | retired from daily use (Oct 2026); kept only as parity reference |
 
 **Never read or write anything on network drives (R:\, A:\).** Real test files are provided locally by the user (`testdaten/`, git-ignored). The user compares checksums on real files himself.
@@ -18,17 +18,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 python web/build.py              # build LumGis.html (commit the result)
-python tests/test_app.py         # Streamlit app regression tests (AppTest, no pytest)
+python archiv/streamlit/test_app.py   # regression tests of the archived Streamlit app (AppTest)
 python tests/test_parity.py      # Python vs. JS: identical report + checksum (needs Node.js)
 python tests/test_parity.py a.xlsx b.xlsx   # parity on additional local files
 node web/tools/report_cli.js file.xlsx      # JS report for one file
-streamlit run app.py             # reference app (or START.bat)
 python docs/anleitung_pdf.py docs/Anleitung.md --logo web/assets/luminum_logo.png --fusszeile "LumGis <version> – Kurzanleitung · Luminum GmbH"
 ```
 
 User manual: `docs/Anleitung.md` → `docs/Anleitung.pdf` (Luminum template). Update both when the UI changes; UI labels and messages are quoted verbatim.
 
-Tests generate Excel files in temp folders (Excel files are git-ignored). After **any** change to reading/parsing logic, change **both** `app.py` and `web/src/core.js` and run both test scripts.
+Tests generate Excel files in temp folders (Excel files are git-ignored). After **any** change to reading/parsing logic, change **both** `archiv/streamlit/app.py` and `web/src/core.js` and run both test scripts.
 
 ## Excel layout (both implementations)
 
@@ -50,6 +49,6 @@ Text = `LumGis-Pruefsumme v1` line, tab-joined data column names, then per row (
 - `vendor/` — Leaflet 1.9.4, proj4js 2.15.0, SheetJS **0.20.3 mini** from cdn.sheetjs.com (npm 0.18.5 has CVEs). See `vendor/VENDOR.md`.
 - No export, no editing (deliberate). All libraries inlined: works offline except map tiles.
 
-## app.py (reference)
+## archiv/streamlit/app.py (reference)
 
 Two-pass reading: `_read_structure` parses sheet XML from the ZIP (merges, headers, hidden rows/cols); `_read_data` uses python-calamine with `to_python(skip_empty_area=False)` — without it calamine trims leading empty rows/columns and all indices shift silently. Map via `build_map_html` (`@st.cache_data`, marker data passed as `markers_json` so it is part of the cache key). Tabs: Karte, Tabelle, Prüfbericht.

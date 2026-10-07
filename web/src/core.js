@@ -1,9 +1,9 @@
 /*
  * LumGis Kern: Excel lesen, Koordinaten, Pruefbericht.
  *
- * Bildet die Leselogik von app.py 1:1 nach (Referenzimplementierung).
+ * Bildet die Leselogik von archiv/streamlit/app.py 1:1 nach (Referenzimplementierung).
  * Fuer dieselbe Datei muessen beide dieselbe Pruefsumme liefern — bei
- * Aenderungen hier immer auch app.py anpassen und tests/test_parity.py laufen lassen.
+ * Aenderungen hier immer auch archiv/streamlit/app.py anpassen und tests/test_parity.py laufen lassen.
  *
  * Laeuft im Browser (window.LumGisCore) und in Node (require) fuer die Tests.
  */

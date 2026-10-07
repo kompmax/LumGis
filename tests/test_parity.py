@@ -1,5 +1,5 @@
 """
-Paritaetstest: app.py (Python) und LumGis.html (JS-Kern web/src/core.js) muessen
+Paritaetstest: archiv/streamlit/app.py (Python-Referenz) und LumGis.html (JS-Kern web/src/core.js) muessen
 fuer dieselbe Datei denselben Pruefbericht und dieselbe Pruefsumme liefern.
 
     python tests/test_parity.py            # synthetische Testdateien
@@ -21,7 +21,7 @@ import warnings
 import openpyxl
 from streamlit.testing.v1 import AppTest
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "archiv", "streamlit"))
 from test_app import APP, make_file  # noqa: E402
 
 warnings.filterwarnings("ignore")
