@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.streamlit/secrets.toml
+
+# Excel-Daten und Exporte nicht versionieren
+*.xlsx
+*.xlsm
+~$*
