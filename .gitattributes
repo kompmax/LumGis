@@ -1,0 +1,4 @@
+# Eingebettete Bibliotheken und das gebaute Tool unveraendert lassen (SHA-256 in VENDOR.md)
+web/vendor/*.js -text
+web/vendor/*.css -text
+LumGis.html -text

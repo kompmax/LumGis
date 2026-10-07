@@ -8,3 +8,7 @@ venv/
 *.xlsx
 *.xlsm
 ~$*
+
+# Lokale Testdateien und Entwicklungs-Einstellungen
+testdaten/
+.claude/

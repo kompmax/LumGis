@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LumGis Leuchtenkarte</title>
+<link rel="icon" href="{{LOGO}}">
+<style>{{CSS_LEAFLET}}</style>
+<style>{{CSS_APP}}</style>
+</head>
+<body>
+<header class="topbar">
+  <img class="logo" src="{{LOGO}}" alt="Luminum">
+  <div class="title">LumGis <span>Leuchtenkarte</span></div>
+  <span class="badge" title="Die Excel-Datei wird nur gelesen, nie verändert.">Nur Ansicht</span>
+  <div class="file" id="fileName"></div>
+  <button id="btnReload" hidden title="Excel-Datei erneut einlesen, z. B. nach Änderungen in Excel">Neu laden</button>
+  <button id="btnOpen" hidden>Andere Datei …</button>
+  <span class="version">v{{VERSION}}</span>
+</header>
+
+<main class="start" id="start">
+  <div class="start-inner">
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Excel-Datei wählen">
+      <h2>Leuchten-Inventar öffnen</h2>
+      <p>Excel-Datei (.xlsx / .xlsm) hierher ziehen</p>
+      <p>oder</p>
+      <button class="btn-primary" id="btnPick" type="button">Datei auswählen …</button>
+    </div>
+    <div class="recent" id="recent" hidden>
+      Zuletzt geöffnet: <button type="button" id="btnRecent"></button>
+    </div>
+    <div id="startMsg"></div>
+    <p class="hint">
+      Erwartet wird das Blatt <b>«Lp»</b> mit den Spaltenüberschriften in Zeile 55 und den Daten ab Zeile 56.
+      Koordinaten in LV95 in den Spalten «Koordinate X» und «Koordinate Y».<br>
+      Die Datei bleibt auf deinem Computer: Sie wird nur im Browser gelesen, nirgends hochgeladen und nie verändert.
+    </p>
+  </div>
+  <input type="file" id="fileInput" accept=".xlsx,.xlsm" hidden>
+</main>
+
+<div class="app" id="app" hidden>
+  <aside class="sidebar">
+    <div class="summary" id="summary"></div>
+
+    <div class="field">
+      <label for="search">Suche (Strasse oder Lichtpunkt-Nr.)</label>
+      <input type="search" id="search" placeholder="z. B. Bahnhofstrasse oder LP-0123" autocomplete="off">
+      <div class="results" id="results" hidden></div>
+    </div>
+
+    <div class="field">
+      <label for="colorCol">Farbe nach</label>
+      <select id="colorCol"></select>
+    </div>
+
+    <div class="filters">
+      <h3>Filter</h3>
+      <div id="filters"></div>
+    </div>
+  </aside>
+
+  <section class="content">
+    <div class="chipbar" id="chipbar"></div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="map" class="active">Karte</button>
+      <button data-tab="table">Tabelle</button>
+      <button data-tab="report">Prüfbericht</button>
+    </nav>
+    <div class="panel" id="panel-map">
+      <div id="map"></div>
+      <div class="basemaps" id="basemaps"></div>
+      <div class="tilewarn" id="tilewarn" hidden>
+        Hintergrundkarte nicht erreichbar (keine Internetverbindung?). Die Leuchten werden trotzdem angezeigt.
+      </div>
+    </div>
+    <div class="panel" id="panel-table" hidden>
+      <div class="tablewrap" id="tablewrap"></div>
+    </div>
+    <div class="panel scroll" id="panel-report" hidden>
+      <div class="report" id="report"></div>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden><div>Datei wird gelesen …</div></div>
+
+<script>{{JS_XLSX}}</script>
+<script>{{JS_PROJ4}}</script>
+<script>{{JS_LEAFLET}}</script>
+<script>{{JS_CORE}}</script>
+<script>const LUMGIS_VERSION = "{{VERSION}}";</script>
+<script>{{JS_APP}}</script>
+</body>
+</html>

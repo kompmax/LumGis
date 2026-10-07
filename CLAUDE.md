@@ -2,50 +2,51 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Running the App
+## Overview
+
+**LumGis** — read-only viewer for lighting fixture (Leuchten) inventories stored in Excel files (.xlsx/.xlsm). UI entirely in German. Two implementations that must read files **identically**:
+
+| | `LumGis.html` (successor) | `app.py` (reference) |
+|---|---|---|
+| Tech | single self-contained HTML, no install | Streamlit (Python) |
+| Source | `web/src/` → built by `web/build.py` | `app.py` |
+| Status | V1, in acceptance | frozen as reference for parity |
+
+**Never read or write anything on network drives (R:\, A:\).** Real test files are provided locally by the user (`testdaten/`, git-ignored). The user compares checksums on real files himself.
+
+## Commands
 
 ```bash
-pip install streamlit pyproj openpyxl pandas python-calamine
-streamlit run app.py --server.headless false --browser.gatherUsageStats false
+python web/build.py              # build LumGis.html (commit the result)
+python tests/test_app.py         # Streamlit app regression tests (AppTest, no pytest)
+python tests/test_parity.py      # Python vs. JS: identical report + checksum (needs Node.js)
+python tests/test_parity.py a.xlsx b.xlsx   # parity on additional local files
+node web/tools/report_cli.js file.xlsx      # JS report for one file
+streamlit run app.py             # reference app (or START.bat)
 ```
 
-Alternatively, double-click `START.bat` on Windows (auto-installs dependencies).
+Tests generate Excel files in temp folders (Excel files are git-ignored). After **any** change to reading/parsing logic, change **both** `app.py` and `web/src/core.js` and run both test scripts.
 
-## Tests
+## Excel layout (both implementations)
 
-```bash
-python tests/test_app.py
-```
+Sheet `Lp`; categories in row 53 (merged cells, value taken from row 53 at the merge's left column); headers in row 55 (newlines collapsed to a space); data from row 56. Columns located by **header name**, never by letter. Hidden rows/columns are ignored. Rows are dropped only if all three ID columns (`Lichtpunkt-Nr.`, `… neu`, `… Projekt`) are empty; loading aborts with a clear message if none of the ID columns exists. Duplicate header names: value of the last column wins.
 
-No pytest needed. The script generates Excel test files in a temp folder (Excel files are git-ignored) and drives the app via Streamlit's `AppTest`. Covers layouts (A1 empty / content only from A15 / column A completely empty), hidden rows/columns, number formatting, LV95 parsing variants, search with special characters, missing ID columns.
+Coordinates: `Koordinate X` / `Koordinate Y` (LV95). E/N assigned per row by value range (E 2.4–2.9 M, N 1.0–1.4 M) so swapped X/Y works; thousands apostrophes and decimal commas accepted. Legacy fallback `GPS Koordinaten (Breite, Länge)` (one cell, auto-detects WGS84 vs LV95). LV95 → WGS84 only for the map: pyproj in Python, proj4js with EPSG:2056 (same towgs84) in JS — agree to < 1 cm.
 
-## What This App Does
+Cell values become text exactly like `python-calamine` + `str()`: integral floats without `.0`, other floats as Python `repr`, dates `YYYY-MM-DD`, datetimes `YYYY-MM-DD HH:MM:SS[.ffffff]`, values < 1 with date format as time, `[h]` formats as `timedelta` text, booleans `True`/`False`, error cells empty. `core.js` reimplements this (`fmtNum`, `pyFloatRepr`, `excelDateToText`).
 
-**Leuchten GIS Dashboard (LumGis)** — a read-only Streamlit viewer for lighting fixture (Leuchten) inventories stored in Excel files (.xlsx/.xlsm). UI is entirely in German. Editing was removed on purpose (v4.2): changes are made in Excel, then "Daten neu laden".
+## Prüfbericht / checksum (must match in both)
 
-## Roadmap
+Text = `LumGis-Pruefsumme v1` line, tab-joined data column names, then per row (Excel order): Excel row, all values, coord source (`LV95 E N` / `WGS84 lat lon` / empty), tab-separated, `\n`-terminated. Checksum = first 8 hex of SHA-256 (`XXXX-XXXX`). Plus counts: rows, with/without/unreadable coordinates, skipped hidden rows (with data), ignored hidden columns (with header), rows without ID, duplicate `Lichtpunkt-Nr.`. Python: `build_report()`; JS: `buildReport()`.
 
-The Streamlit app is being kept as the **reference implementation**. Planned successor: a single self-contained HTML file (`LumGis.html`, SheetJS + Leaflet + proj4js inlined, no installation). Before switching, a parity test must show both parsers produce identical results on real Lp files. Do not read or write anything on network drives (R:\, A:\) — real test files must be provided locally by the user.
+## LumGis.html (web/)
 
-## Architecture (app.py, single file)
+- `src/core.js` — parsing, coordinates, report; UMD so it runs in the browser and in Node (tests).
+- `src/app.js` — UI: open via File System Access API (handle kept for «Neu laden» and «Zuletzt geöffnet» in IndexedDB) or file input/drag & drop; Leaflet map (canvas circle markers, lazy popups with Excel row, pulse on search hit), basemaps OSM / swisstopo Landeskarte / SWISSIMAGE (WMTS 3857, no key), tile-error banner; colour legend with colour-blind palette, colours persisted in localStorage; category filters (2–150 distinct values, not IDs/coords) with chips; search (street + 3 IDs, substring); table (max 3000 rows); Prüfbericht with copy-to-clipboard details.
+- `src/index.html`, `src/style.css` — template (`{{PLACEHOLDER}}`) and styles (Luminum orange `#F37021`, Segoe UI; header stays light for the logo).
+- `vendor/` — Leaflet 1.9.4, proj4js 2.15.0, SheetJS **0.20.3 mini** from cdn.sheetjs.com (npm 0.18.5 has CVEs). See `vendor/VENDOR.md`.
+- No export, no editing (deliberate). All libraries inlined: works offline except map tiles.
 
-1. **Constants**: sheet `Lp`, categories in row 53 (merged cells), headers in row 55, data from row 56. Columns are located by **header name**, never by letter. Coordinate columns: `Koordinate X` / `Koordinate Y` (LV95); legacy `GPS Koordinaten (Breite, Länge)` as fallback.
+## app.py (reference)
 
-2. **Coordinates**: LV95 → WGS84 via pyproj (only needed for Leaflet). E/N are assigned per row by value range (E 2.4–2.9 M, N 1.0–1.4 M), so swapped X/Y works. Accepts thousands apostrophes and decimal commas. Legacy column auto-detects WGS84 vs. LV95.
-
-3. **Two-pass Excel reading**:
-   - **Pass 1 (`_read_structure`)**: parses the sheet XML directly from the ZIP (no openpyxl) for merged cells, headers, hidden columns/rows.
-   - **Pass 2 (`_read_data`)**: python-calamine for bulk data. Must use `to_python(skip_empty_area=False)` — otherwise calamine trims leading empty rows/columns and all indices shift silently. All values are converted to text here (integral floats → `"30"`, not `"30.0"`).
-
-4. **File browser (`render_file_selector`)**: OS-level directory browser with quick-access drive buttons.
-
-5. **Leaflet map (`prepare_map_data` / `build_map_html`)**: self-contained HTML with markers, lazy popups (incl. Excel row), live color pickers in the legend. `build_map_html` is `@st.cache_data`-cached; all marker data goes in as `markers_json` so it is part of the cache key.
-
-6. **Streamlit UI**: sidebar with color coding, category filters, search (street + all three ID columns, plain substring, `regex=False`). No export (removed in v4.2; lists are filtered in Excel). Tabs: Karte, Tabelle (with Excel row), Diagnose (found columns, unparseable coordinate rows).
-
-## Key Design Decisions
-
-- **Read-only**: no write access to the source Excel at all.
-- **Session state**: loaded data (`df`, `cat_map`, `col_info`, …) lives in `st.session_state`; loading aborts with a clear message if none of the ID columns exists.
-- **Internal columns**: `_lat`, `_lon`, `_excel_row` are prefixed with `_` and excluded from display.
-- **ID columns**: `Lichtpunkt-Nr.`, `Lichtpunkt-Nr. neu`, `Lichtpunkt-Nr. Projekt`; a row is dropped only if all three are empty. Marker titles use the first non-empty one.
+Two-pass reading: `_read_structure` parses sheet XML from the ZIP (merges, headers, hidden rows/cols); `_read_data` uses python-calamine with `to_python(skip_empty_area=False)` — without it calamine trims leading empty rows/columns and all indices shift silently. Map via `build_map_html` (`@st.cache_data`, marker data passed as `markers_json` so it is part of the cache key). Tabs: Karte, Tabelle, Prüfbericht.

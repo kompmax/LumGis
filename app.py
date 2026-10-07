@@ -3,6 +3,7 @@ Leuchten GIS Dashboard v4.2
 Lichtplanungsbuero - Inventar-Viewer (nur Ansicht)
 """
 
+import hashlib
 import io
 import json
 import os
@@ -54,6 +55,12 @@ _TRANSFORMER = Transformer.from_crs("EPSG:2056", "EPSG:4326", always_xy=True)
 # -----------------------------------------------
 # KOORDINATEN
 # -----------------------------------------------
+def _fmt_num(x):
+    """Zahl als Text wie Python repr; Ganzzahlen ohne '.0'. Muss mit fmtNum in web/src/core.js uebereinstimmen."""
+    x = float(x)
+    return str(int(x)) if x.is_integer() else repr(x)
+
+
 def _to_number(series):
     """Text -> float. Akzeptiert Tausender-Apostroph/Leerzeichen und Dezimalkomma."""
     s = (
@@ -115,13 +122,19 @@ def _add_coordinates(df):
         north = north.where(~missing, l_north)
 
     ok = east.notna() & north.notna()
+    is_wgs = lat.notna() & lon.notna() & ~ok
+    src = pd.Series("", index=df.index, dtype=object)
     if ok.any():
         lons, lats = _TRANSFORMER.transform(east[ok].values, north[ok].values)
         lat[ok] = lats
         lon[ok] = lons
+        src[ok] = [f"LV95 {_fmt_num(e)} {_fmt_num(n)}" for e, n in zip(east[ok], north[ok])]
+    if is_wgs.any():
+        src[is_wgs] = [f"WGS84 {_fmt_num(a)} {_fmt_num(b)}" for a, b in zip(lat[is_wgs], lon[is_wgs])]
 
     df["_lat"] = lat.astype(float)
     df["_lon"] = lon.astype(float)
+    df["_coord_src"] = src
     return df
 
 
@@ -316,11 +329,12 @@ def _read_structure(filepath):
             headers[c] = re.sub(r"\s*\n\s*", " ", str(val).strip()).strip()
 
     # Remove hidden columns from headers and categories
+    n_hidden_cols = sum(1 for ci in hidden_cols if ci in headers)
     for ci in hidden_cols:
         headers.pop(ci, None)
         category_by_col.pop(ci, None)
 
-    return headers, category_by_col, hidden_rows
+    return headers, category_by_col, hidden_rows, n_hidden_cols
 
 
 def _read_data(filepath, headers, hidden_rows):
@@ -348,11 +362,10 @@ def _read_data(filepath, headers, hidden_rows):
     all_rows = wb.get_sheet_by_name(SHEET_NAME).to_python(skip_empty_area=False)
 
     data_rows = []
+    n_hidden_rows = 0
     for row_num, row_tuple in enumerate(
         all_rows[DATA_START_ROW - 1:], start=DATA_START_ROW
     ):
-        if row_num in hidden_rows:
-            continue
         row_data = {"_excel_row": row_num}
         has_value = False
         for c, header in zip(col_indices, header_list):
@@ -368,16 +381,20 @@ def _read_data(filepath, headers, hidden_rows):
             row_data[header] = val
             if val is not None:
                 has_value = True
-        if has_value:
-            data_rows.append(row_data)
+        if not has_value:
+            continue
+        if row_num in hidden_rows:
+            n_hidden_rows += 1
+            continue
+        data_rows.append(row_data)
 
-    return data_rows
+    return data_rows, n_hidden_rows
 
 
 @st.cache_data(show_spinner="Daten werden geladen ...")
 def read_excel_structure(filepath, file_mtime):
-    headers, category_by_col, hidden_rows = _read_structure(filepath)
-    data_rows = _read_data(filepath, headers, hidden_rows)
+    headers, category_by_col, hidden_rows, n_hidden_cols = _read_structure(filepath)
+    data_rows, n_hidden_rows = _read_data(filepath, headers, hidden_rows)
 
     df = pd.DataFrame(data_rows)
     if df.empty:
@@ -397,6 +414,7 @@ def read_excel_structure(filepath, file_mtime):
         return pd.Series(True, index=df.index)
 
     drop_mask = _col_empty(ID_COL) & _col_empty(ID_COL_NEU) & _col_empty(ID_COL_PROJEKT)
+    n_no_id = int(drop_mask.sum())
     df = df[~drop_mask].reset_index(drop=True)
 
     # Category and col_info mapping
@@ -423,7 +441,53 @@ def read_excel_structure(filepath, file_mtime):
     # Batch coordinate conversion
     df = _add_coordinates(df)
 
-    return df, cat_map, ordered_categories, col_info
+    report = build_report(df, n_hidden_rows=n_hidden_rows, n_hidden_cols=n_hidden_cols, n_no_id=n_no_id)
+    return df, cat_map, ordered_categories, col_info, report
+
+
+# -----------------------------------------------
+# PRUEFBERICHT
+# -----------------------------------------------
+REPORT_VERSION = "LumGis-Pruefsumme v1"
+
+
+def build_report(df, n_hidden_rows, n_hidden_cols, n_no_id):
+    """Kennzahlen + Pruefsumme. Identisch zu buildReport() in web/src/core.js —
+    beide Tools muessen fuer dieselbe Datei dieselbe Pruefsumme liefern."""
+    data_cols = [c for c in df.columns if not c.startswith("_")]
+    lines = [REPORT_VERSION, "\t".join(data_cols)]
+    for rec in df[["_excel_row"] + data_cols + ["_coord_src"]].itertuples(index=False, name=None):
+        lines.append("\t".join([str(int(rec[0]))] + list(rec[1:])))
+    details = "\n".join(lines) + "\n"
+    digest = hashlib.sha256(details.encode("utf-8")).hexdigest().upper()
+
+    present = [c for c in COORD_COLS if c in df.columns]
+    has_raw = pd.Series(False, index=df.index)
+    for c in present:
+        has_raw |= ~df[c].str.strip().isin(EMPTY_VALS)
+    has_coord = df["_lat"].notna()
+
+    duplicates = []
+    if ID_COL in df.columns:
+        ids = df[ID_COL].str.strip()
+        ids = ids[~ids.isin(EMPTY_VALS)]
+        for val, rows in df.loc[ids.index, "_excel_row"].groupby(ids, sort=True):
+            if len(rows) > 1:
+                duplicates.append((val, [int(r) for r in rows]))
+
+    return {
+        "rows": len(df),
+        "with_coords": int(has_coord.sum()),
+        "no_coords": int((~has_raw).sum()),
+        "invalid_coords": int((has_raw & ~has_coord).sum()),
+        "invalid_rows": [int(r) for r in df.loc[has_raw & ~has_coord, "_excel_row"]],
+        "hidden_rows": n_hidden_rows,
+        "hidden_cols": n_hidden_cols,
+        "no_id": n_no_id,
+        "duplicates": duplicates,
+        "checksum": f"{digest[:4]}-{digest[4:8]}",
+        "details": details,
+    }
 
 
 # -----------------------------------------------
@@ -865,11 +929,11 @@ if "filepath" not in st.session_state or st.session_state.filepath is None:
 # --- DATEN LADEN ---
 filepath = st.session_state.filepath
 
-_LOAD_KEYS = ["filepath", "df", "cat_map", "ordered_categories", "col_info", "filterable_cols"]
+_LOAD_KEYS = ["filepath", "df", "cat_map", "ordered_categories", "col_info", "filterable_cols", "report"]
 
 if "df" not in st.session_state:
     try:
-        df, cat_map, ordered_categories, col_info = read_excel_structure(
+        df, cat_map, ordered_categories, col_info, report = read_excel_structure(
             filepath, os.path.getmtime(filepath)
         )
         id_cols_found = [c for c in (ID_COL, ID_COL_NEU, ID_COL_PROJEKT) if c in col_info]
@@ -880,6 +944,7 @@ if "df" not in st.session_state:
                 f"Gefundene Spalten: {', '.join(col_info) or 'keine'}"
             )
         st.session_state.df = df
+        st.session_state.report = report
         st.session_state.cat_map = cat_map
         st.session_state.ordered_categories = ordered_categories
         st.session_state.col_info = col_info
@@ -993,7 +1058,7 @@ st.caption(
 
 st.markdown("---")
 
-tab_map, tab_table, tab_debug = st.tabs(["Karte", "Tabelle", "Diagnose"])
+tab_map, tab_table, tab_report = st.tabs(["Karte", "Tabelle", "Pruefbericht"])
 
 # -- TAB: KARTE --
 with tab_map:
@@ -1015,26 +1080,55 @@ with tab_table:
         hide_index=True,
     )
 
-# -- TAB: DIAGNOSE --
-with tab_debug:
-    st.markdown("#### Diagnose")
+# -- TAB: PRUEFBERICHT --
+with tab_report:
+    report = st.session_state.report
+    st.markdown("#### Pruefbericht")
+    st.caption(
+        "Dieselbe Datei muss in LumGis.html dieselbe Pruefsumme ergeben. "
+        "Ist sie verschieden, unter «Details» beide Listen vergleichen."
+    )
+    st.markdown(f"### Pruefsumme: `{report['checksum']}`")
 
-    st.markdown(f"**Datei:** `{filepath}`")
-    st.markdown(f"**Arbeitsblatt:** `{SHEET_NAME}`")
-    st.markdown(f"**Kategorien:** {len(ordered_categories)}")
-    st.markdown(f"**Parameter (Spalten):** {len(col_info)}")
-    st.markdown(f"**Datensaetze:** {len(df)}")
+    dup_count = len(report["duplicates"])
+    st.table(pd.DataFrame(
+        [
+            ("Leuchten gelesen", report["rows"]),
+            ("davon mit Koordinaten", report["with_coords"]),
+            ("ohne Koordinaten", report["no_coords"]),
+            ("Koordinaten nicht lesbar", report["invalid_coords"]),
+            ("ausgeblendete Zeilen uebersprungen", report["hidden_rows"]),
+            ("ausgeblendete Spalten ignoriert", report["hidden_cols"]),
+            ("Zeilen ohne Lichtpunkt-Nr. verworfen", report["no_id"]),
+            ("doppelte Lichtpunkt-Nr.", dup_count),
+        ],
+        columns=["Kennzahl", "Anzahl"],
+    ).set_index("Kennzahl"))
+
+    if report["invalid_coords"]:
+        with st.expander(f"Koordinaten nicht lesbar ({report['invalid_coords']})"):
+            present_coord_cols = [c for c in COORD_COLS if c in df.columns]
+            id_cols = [c for c in (ID_COL, STREET_COL) if c in df.columns]
+            invalid = df[df["_excel_row"].isin(report["invalid_rows"])]
+            st.dataframe(
+                invalid[["_excel_row"] + id_cols + present_coord_cols]
+                .rename(columns={"_excel_row": "Excel-Zeile"}),
+                use_container_width=True,
+                hide_index=True,
+            )
+    if dup_count:
+        with st.expander(f"Doppelte Lichtpunkt-Nr. ({dup_count})"):
+            st.dataframe(
+                pd.DataFrame(
+                    [(v, ", ".join(map(str, rows))) for v, rows in report["duplicates"]],
+                    columns=["Lichtpunkt-Nr.", "Excel-Zeilen"],
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
 
     st.markdown("---")
-    st.markdown("**Kategorien und zugehoerige Spalten:**")
-    for cat in ordered_categories:
-        cat_cols = cols_by_cat.get(cat, [])
-        with st.expander(f"{cat} ({len(cat_cols)} Spalten)", expanded=False):
-            for c in cat_cols:
-                col_letter = get_column_letter(col_info[c]["col_index"])
-                st.write(f"  {col_letter}: `{c}`")
-
-    st.markdown("---")
+    st.markdown("**Gefundene Spalten**")
     for check_col, label in [
         (COORD_X_COL, "Koordinate X (LV95)"),
         (COORD_Y_COL, "Koordinate Y (LV95)"),
@@ -1043,32 +1137,17 @@ with tab_debug:
         (STREET_COL, "Strasse-Spalte"),
     ]:
         if check_col in col_info:
-            letter = get_column_letter(col_info[check_col]["col_index"])
-            status = f"gefunden in Spalte {letter}"
+            status = f"Spalte {get_column_letter(col_info[check_col]['col_index'])}"
         else:
-            status = "NICHT gefunden"
-        st.markdown(f"**{label}** `{check_col}`: {status}")
+            status = "nicht gefunden"
+        st.markdown(f"- {label} `{check_col}`: {status}")
 
-    present_coord_cols = [c for c in COORD_COLS if c in df.columns]
-    if present_coord_cols:
-        st.markdown("---")
-        has_raw = pd.Series(False, index=df.index)
-        for c in present_coord_cols:
-            has_raw |= ~df[c].str.strip().isin(EMPTY_VALS)
-        invalid = df[has_raw & df["_lat"].isna()]
+    with st.expander(f"Kategorien und Spalten ({len(ordered_categories)} Kategorien, {len(col_info)} Spalten)"):
+        for cat in ordered_categories:
+            st.markdown(f"**{cat}**")
+            st.write(", ".join(
+                f"{get_column_letter(col_info[c]['col_index'])}: {c}" for c in cols_by_cat.get(cat, [])
+            ))
 
-        st.markdown("**Koordinaten roh und umgerechnet (erste 3):**")
-        st.dataframe(
-            df.loc[df["_lat"].notna(), present_coord_cols + ["_lat", "_lon"]].head(3),
-            use_container_width=True,
-        )
-        st.markdown(f"**Zeilen mit Koordinaten-Eintrag, aber nicht interpretierbar:** {len(invalid)}")
-        if len(invalid):
-            id_cols = [c for c in (ID_COL, STREET_COL) if c in df.columns]
-            st.dataframe(
-                invalid[["_excel_row"] + id_cols + present_coord_cols]
-                .rename(columns={"_excel_row": "Excel-Zeile"}),
-                use_container_width=True,
-                hide_index=True,
-            )
-
+    with st.expander("Details fuer den Vergleich (Kopier-Symbol oben rechts)"):
+        st.code(report["details"], language=None)
