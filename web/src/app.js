@@ -16,9 +16,11 @@
   const MAX_FILTER_UNIQUE = 150;
   const MAX_TABLE_ROWS = 3000;
 
+  // Nur swisstopo: OpenStreetMap sperrt Kachelabrufe ohne Referer, und eine per Doppelklick
+  // geoeffnete Datei (file://) sendet keinen -> 403 «Access blocked».
   const BASEMAPS = {
-    osm: { label: "Strassenkarte", url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      opts: { maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap-Mitwirkende" } },
+    strasse: { label: "Strassenkarte", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swisstlm3d-karte-farbe/default/current/3857/{z}/{x}/{y}.png",
+      opts: { maxZoom: 21, maxNativeZoom: 19, attribution: "© swisstopo swissTLM3D" } },
     lk: { label: "Landeskarte", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg",
       opts: { maxZoom: 21, maxNativeZoom: 19, attribution: "© swisstopo" } },
     img: { label: "Luftbild", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg",
@@ -295,10 +297,10 @@
     if (map) return;
     map = L.map("map", { preferCanvas: true, zoomControl: true }).setView([46.8, 8.2], 8);
     markerLayer = L.layerGroup().addTo(map);
-    const wanted = store.get("basemap", "osm");
+    const wanted = store.get("basemap", "strasse");
     $("basemaps").innerHTML = Object.entries(BASEMAPS)
       .map(([k, b]) => `<button data-basemap="${k}">${b.label}</button>`).join("");
-    setBasemap(BASEMAPS[wanted] ? wanted : "osm");
+    setBasemap(BASEMAPS[wanted] ? wanted : "strasse");
   }
 
   function setBasemap(key) {
@@ -360,7 +362,7 @@
     });
     if (fit && shown.length) {
       const bounds = L.latLngBounds(shown.map((mk) => mk.getLatLng()));
-      map.fitBounds(bounds.pad(0.05), { maxZoom: 18 });
+      map.fitBounds(bounds.pad(0.05), { maxZoom: 18, animate: false });
     }
     setTimeout(() => map.invalidateSize(), 0);
   }
@@ -400,7 +402,7 @@
     if (!mk) { alert("Diese Leuchte hat keine gültigen Koordinaten und ist nicht auf der Karte."); return; }
     switchTab("map");
     if (!markerLayer.hasLayer(mk)) markerLayer.addLayer(mk);
-    map.setView(mk.getLatLng(), Math.max(map.getZoom(), 18));
+    map.setView(mk.getLatLng(), Math.max(map.getZoom(), 18), { animate: false });
     if (pulseMarker) pulseMarker.remove();
     pulseMarker = L.marker(mk.getLatLng(), {
       icon: L.divIcon({ className: "", html: '<div class="pulse"></div>', iconSize: [40, 40] }), interactive: false,
@@ -576,6 +578,9 @@
     $("recent").hidden = false;
     $("btnRecent").addEventListener("click", () => openHandle(handle, true));
   }
+
+  // Fuer Fehlersuche in der Browser-Konsole
+  window.LumGisDebug = { state, get map() { return map; } };
 
   bind();
   showRecent();
