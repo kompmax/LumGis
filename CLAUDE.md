@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---|---|---|
 | Tech | single self-contained HTML, no install | Streamlit (Python) |
 | Source | `web/src/` → built by `web/build.py` | `app.py` |
-| Status | V1, in acceptance | frozen as reference for parity |
+| Status | in daily use (v1.0.1) | retired from daily use (Oct 2026); kept only as parity reference |
 
 **Never read or write anything on network drives (R:\, A:\).** Real test files are provided locally by the user (`testdaten/`, git-ignored). The user compares checksums on real files himself.
 
@@ -23,7 +23,10 @@ python tests/test_parity.py      # Python vs. JS: identical report + checksum (n
 python tests/test_parity.py a.xlsx b.xlsx   # parity on additional local files
 node web/tools/report_cli.js file.xlsx      # JS report for one file
 streamlit run app.py             # reference app (or START.bat)
+python docs/anleitung_pdf.py docs/Anleitung.md --logo web/assets/luminum_logo.png --fusszeile "LumGis <version> – Kurzanleitung · Luminum GmbH"
 ```
+
+User manual: `docs/Anleitung.md` → `docs/Anleitung.pdf` (Luminum template). Update both when the UI changes; UI labels and messages are quoted verbatim.
 
 Tests generate Excel files in temp folders (Excel files are git-ignored). After **any** change to reading/parsing logic, change **both** `app.py` and `web/src/core.js` and run both test scripts.
 

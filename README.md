@@ -8,9 +8,11 @@ Zeigt ein Leuchten-Inventar aus Excel (Blatt «Lp») auf einer Karte – mit Fil
 
 Erwartetes Excel-Layout: Blatt `Lp`, Kategorien in Zeile 53, Spaltenüberschriften in Zeile 55, Daten ab Zeile 56, Koordinaten in LV95 in «Koordinate X» und «Koordinate Y».
 
-## Prüfsumme vergleichen
+Kurzanleitung: [docs/Anleitung.pdf](docs/Anleitung.pdf).
 
-Der Prüfbericht zeigt eine Prüfsumme (z. B. `BDE1-51F2`). Dieselbe Datei muss in `LumGis.html` und im Python-Referenztool (`app.py`, Tab «Pruefbericht») dieselbe Prüfsumme ergeben. Bei Abweichung unter «Details» beide Listen vergleichen.
+## Python-Version (nur Referenz)
+
+`app.py` / `START.bat` ist die frühere Streamlit-Version und wird seit Oktober 2026 nicht mehr im Alltag genutzt. Sie bleibt im Repo als Referenz: `tests/test_parity.py` prüft, dass beide Versionen jede Datei identisch lesen (gleiche Prüfsumme).
 
 ## Entwicklung
 
@@ -18,6 +20,7 @@ Der Prüfbericht zeigt eine Prüfsumme (z. B. `BDE1-51F2`). Dieselbe Datei muss 
 python web/build.py           # LumGis.html aus web/src bauen
 python tests/test_app.py      # Tests Python-Referenz
 python tests/test_parity.py   # Python und HTML lesen identisch (braucht Node.js)
+python docs/anleitung_pdf.py docs/Anleitung.md --logo web/assets/luminum_logo.png --fusszeile "LumGis 1.0.1 – Kurzanleitung · Luminum GmbH"
 ```
 
 Details zur Architektur: [CLAUDE.md](CLAUDE.md).

@@ -2,3 +2,4 @@
 web/vendor/*.js -text
 web/vendor/*.css -text
 LumGis.html -text
+docs/Anleitung.pdf -text

@@ -4,6 +4,9 @@ echo ============================================
 echo   Leuchten GIS Dashboard v4.2
 echo ============================================
 echo.
+echo HINWEIS: Fuer die taegliche Arbeit LumGis.html verwenden (Doppelklick).
+echo Dieses Python-Tool dient nur noch als Referenz fuer Pruefsummen-Tests.
+echo.
 
 :: Pruefe ob Python vorhanden ist
 python --version >nul 2>&1
