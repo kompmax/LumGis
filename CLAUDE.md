@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---|---|---|
 | Tech | single self-contained HTML, no install | Streamlit (Python) |
 | Source | `web/src/` → built by `web/build.py` | `archiv/streamlit/app.py` |
-| Status | in daily use (v1.0.1) | retired from daily use (Oct 2026); kept only as parity reference |
+| Status | in daily use (v1.1.0) | retired from daily use (Oct 2026); kept only as parity reference |
 
 **Never read or write anything on network drives (R:\, A:\).** Real test files are provided locally by the user (`testdaten/`, git-ignored). The user compares checksums on real files himself.
 
@@ -47,7 +47,9 @@ Text = `LumGis-Pruefsumme v1` line, tab-joined data column names, then per row (
 - `src/app.js` — UI: open via File System Access API (handle kept for «Neu laden» and «Zuletzt geöffnet» in IndexedDB) or file input/drag & drop; Leaflet map (canvas circle markers, lazy popups with Excel row, pulse on search hit), basemaps swisstopo swissTLM3D-Karte («Strassenkarte») / Landeskarte / SWISSIMAGE (WMTS 3857, no key). **No OpenStreetMap tiles**: OSM blocks requests without Referer, and file:// pages send none (403), tile-error banner; colour legend with colour-blind palette, colours persisted in localStorage; category filters (2–150 distinct values, not IDs/coords) with chips; search (street + 3 IDs, substring); table (max 3000 rows); Prüfbericht with copy-to-clipboard details.
 - `src/index.html`, `src/style.css` — template (`{{PLACEHOLDER}}`) and styles (Luminum orange `#F37021`, Segoe UI; header stays light for the logo).
 - `vendor/` — Leaflet 1.9.4, proj4js 2.15.0, SheetJS **0.20.3 mini** from cdn.sheetjs.com (npm 0.18.5 has CVEs). See `vendor/VENDOR.md`.
-- No export, no editing (deliberate). All libraries inlined: works offline except map tiles.
+- **Mode «Erfassen»** (capture, v1.1.0): only rows **without valid coordinates** can be placed (decision: office use on the aerial image, never move existing coordinates). Pick a row → click map → auto-advance to the next missing row (Excel order); orange draggable markers; existing points shown as white non-interactive context markers; Esc cancels. Positions converted with proj4js inverse (`core.toLV95`), rounded to cm, stored in localStorage `lumgis.capture.<file name>` (keyed by title|Excel row). On load/«Neu laden», positions whose row now has valid coordinates are dropped («übernommen»). Output: «Koordinatenliste speichern» = xlsx (Excel-Zeile, ID columns, Strasse, Koordinate X/Y; X = east or north detected from existing data). LumGis never writes to the inventory file.
+- No data export, no editing (deliberate). All libraries inlined: works offline except map tiles.
+- Separate repo `gis_leuchten_koordinaten` (old GPS capture tool) stays in use for projects **without** an Lp inventory until the user decides otherwise.
 
 ## archiv/streamlit/app.py (reference)
 

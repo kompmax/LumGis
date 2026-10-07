@@ -6,8 +6,9 @@ LumGis zeigt ein Leuchten-Inventar aus Excel auf einer Karte. Es liefert:
 - **Filter und Suche**, um Leuchten nach Typ, Strasse oder Nummer einzugrenzen
 - **Tabelle** mit den gefilterten Leuchten und der Excel-Zeile
 - **Prüfbericht** mit Hinweisen auf fehlende oder fehlerhafte Angaben
+- **Erfassen**: fehlende Koordinaten auf der Karte setzen und als Liste speichern
 
-LumGis ist **nur eine Ansicht**. Die Excel-Datei wird nie verändert. Änderungen macht man direkt in Excel.
+LumGis verändert die Excel-Datei nie. Änderungen und erfasste Koordinaten überträgt man selbst in Excel.
 
 ## 1. Starten
 
@@ -33,7 +34,7 @@ LumGis sucht die Spalten über die Überschrift, nicht über den Buchstaben. Spa
 
 ## 3. Das Fenster
 
-- **Oben:** Dateiname, **Neu laden** und **Andere Datei …**.
+- **Oben:** die Modi **Ansehen** und **Erfassen**, Dateiname, **Neu laden** und **Andere Datei …**.
 - **Links:** Übersicht, Suche, **Farbe nach** und die **Filter**.
 - **Mitte:** die Ansichten **Karte**, **Tabelle** und **Prüfbericht**. Darüber stehen die aktiven Filter.
 
@@ -84,7 +85,30 @@ Filter und Suche bleiben dabei erhalten. Mit **Andere Datei …** wird eine ande
 
 **Wichtig:** Ohne **Neu laden** zeigt LumGis weiterhin den Stand beim Öffnen.
 
-## 5. Koordinaten – was man wissen muss
+## 5. Fehlende Koordinaten erfassen
+
+Im Modus **Erfassen** setzt man Leuchten ohne gültige Koordinaten auf der Karte. Bestehende Koordinaten lassen sich hier nicht ändern. Das macht man in Excel.
+
+### 5.1 Positionen setzen
+
+1. Oben auf **Erfassen** klicken. Links erscheinen alle Leuchten ohne gültige Koordinaten, in der Reihenfolge der Excel-Zeilen.
+2. Rechts oben auf **Luftbild** wechseln. Darauf sind Masten meist gut zu erkennen.
+3. Links eine Leuchte anklicken. Die Karte springt zu der Leuchte mit Koordinaten, die in Excel am nächsten liegt.
+4. Auf der Karte an die richtige Stelle klicken. Der Punkt erscheint orange, und die nächste Leuchte ist gleich ausgewählt.
+
+Die vorhandenen Leuchten erscheinen als weisse Punkte zur Orientierung. Ein gesetzter orangefarbener Punkt lässt sich mit der Maus verschieben. **Esc** bricht das Setzen ab. Mit dem Pfeil rechts neben einer gesetzten Leuchte wird ihre Position wieder entfernt.
+
+**Wichtig:** Die gesetzten Positionen werden nur in diesem Browser auf diesem Computer gespeichert, unter dem Namen der Excel-Datei. Sie überstehen das Schliessen des Browsers, aber nicht das Löschen der Browserdaten. Deshalb die Koordinatenliste regelmässig speichern.
+
+### 5.2 In Excel übernehmen
+
+1. **Koordinatenliste speichern** klicken. Im Download-Ordner liegt eine Excel-Datei, z. B. «Inventar_Koordinaten_20261007.xlsx», mit den Spalten Excel-Zeile, Lichtpunkt-Nr., Strasse, «Koordinate X» und «Koordinate Y».
+2. Die Werte in die Inventar-Datei übertragen. Bei wenigen Leuchten anhand der Excel-Zeile von Hand kopieren. Bei vielen Leuchten mit XVERWEIS über die Lichtpunkt-Nr., danach die Formeln mit **Inhalte einfügen → Werte** ersetzen.
+3. Die Inventar-Datei speichern und in LumGis **Neu laden** klicken.
+
+LumGis erkennt die übernommenen Leuchten und nimmt sie aus der Liste. Ob X den Ost- oder den Nordwert enthält, richtet sich nach den vorhandenen Daten in der Datei.
+
+## 6. Koordinaten – was man wissen muss
 
 - Erwartet wird **LV95**, z. B. X = 2'683'000 und Y = 1'247'000.
 - Ob Ost und Nord in X oder in Y stehen, erkennt LumGis selbst am Wertebereich. Beide Schreibweisen funktionieren.
@@ -92,7 +116,7 @@ Filter und Suche bleiben dabei erhalten. Mit **Andere Datei …** wird eine ande
 - Ältere Dateien mit der Spalte «GPS Koordinaten (Breite, Länge)» funktionieren weiterhin. Dort ist auch WGS84 möglich (z. B. 47.3769, 8.5417).
 - Leuchten ohne gültige Koordinaten fehlen auf der Karte, erscheinen aber in der Tabelle und im Prüfbericht.
 
-## 6. Prüfbericht
+## 7. Prüfbericht
 
 Der **Prüfbericht** zeigt, was beim Lesen aufgefallen ist:
 
@@ -111,7 +135,7 @@ Nicht lesbare Koordinaten und doppelte Nummern sind mit Excel-Zeile aufgelistet.
 
 Die **Prüfsumme** (z. B. `BDE1-51F2`) ist ein Fingerabdruck aller gelesenen Werte. Haben zwei Personen dieselbe Prüfsumme, arbeiten sie mit demselben Datenstand. Ändert sich auch nur eine Zelle, ändert sich die Prüfsumme.
 
-## 7. Häufige Fragen
+## 8. Häufige Fragen
 
 **Die Karte bleibt grau, oben erscheint «Hintergrundkarte nicht erreichbar (keine Internetverbindung?)».**
 Die Internetverbindung prüfen. Die Leuchten werden trotzdem angezeigt, nur ohne Hintergrund.
@@ -131,10 +155,13 @@ Im **Prüfbericht** nachsehen, ob sie ohne oder mit nicht lesbaren Koordinaten a
 **Meldung «Diese Leuchte hat keine gültigen Koordinaten und ist nicht auf der Karte.»**
 Die Leuchte wurde gefunden, hat aber keine gültigen Koordinaten. In Excel X und Y ergänzen und **Neu laden** klicken.
 
-**Kann ich Daten exportieren?**
-Nein, bewusst nicht. Listen filtert man in Excel mit dem AutoFilter. Dort bleiben Formatierung und Formeln erhalten.
+**Ich sehe meine erfassten Positionen auf einem anderen Computer nicht.**
+Die Positionen sind nur im Browser gespeichert, in dem sie gesetzt wurden. Für die Weitergabe die **Koordinatenliste speichern**.
 
-## 8. Hinweise
+**Kann ich Daten exportieren?**
+Nein, bewusst nicht. Ausnahme ist die Koordinatenliste im Modus **Erfassen**. Listen filtert man in Excel mit dem AutoFilter. Dort bleiben Formatierung und Formeln erhalten.
+
+## 9. Hinweise
 
 Die Hintergrundkarten stammen vom Bundesamt für Landestopografie swisstopo. Die Lage der Leuchten ist so genau wie die Koordinaten in der Excel-Datei.
 

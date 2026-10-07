@@ -220,6 +220,46 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
   .sidebar { width: auto; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--line); }
   .topbar .title span, .topbar .file { display: none; }
 }
+
+/* Modus-Umschalter Ansehen / Erfassen */
+.topbar .modes { display: flex; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.topbar .modes button { border: none; border-radius: 0; padding: 5px 14px; background: #fff; color: #111; }
+.topbar .modes button.active { background: var(--orange); color: #fff; }
+
+/* Erfassen */
+.hint.small { font-size: 12px; margin: 10px 0 0; }
+.capactions { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 10px; }
+.capactions .btn-primary { margin-top: 0; }
+.capactions .btn-primary:disabled { opacity: .45; cursor: default; filter: none; }
+.linkbtn { border: none; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 2px 0; font-size: 12px; }
+.caphead { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 6px; }
+.caphead span { color: var(--orange); }
+.capitem {
+  position: relative; background: var(--bg); border: 1px solid var(--line); border-left: 4px solid var(--line);
+  border-radius: 6px; padding: 6px 30px 6px 10px; margin-bottom: 4px; cursor: pointer;
+}
+.capitem:hover { border-color: var(--orange); }
+.capitem.open { border-left-color: #9ca3af; }
+.capitem.done { border-left-color: var(--ok); }
+.capitem.placing { border-color: var(--orange); border-left-color: var(--orange); background: var(--orange-soft); }
+.capitem .t { font-weight: 600; display: block; }
+.capitem small { color: var(--muted); display: block; word-break: break-word; }
+.capitem .undo {
+  position: absolute; top: 6px; right: 6px; border: none; background: none; cursor: pointer; font-size: 15px; color: var(--muted);
+}
+.capitem .undo:hover { color: var(--err-fg); }
+.capbanner {
+  position: absolute; top: 10px; left: 56px; right: 290px; z-index: 1000; background: #111; color: #fff;
+  border-radius: 8px; padding: 7px 12px; font-size: 13px; box-shadow: var(--shadow); text-align: center;
+}
+.capbanner b { color: #fdba74; }
+#map.placing, #map.placing .leaflet-interactive { cursor: crosshair; }
+.capdot {
+  width: 16px; height: 16px; border-radius: 50%; background: var(--orange); border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #7c2d12, 0 2px 6px rgba(0, 0, 0, .4);
+}
+.capdot.sel { box-shadow: 0 0 0 3px #111, 0 2px 6px rgba(0, 0, 0, .4); }
+@media (max-width: 760px) { .capbanner { right: 10px; top: 52px; } }
 </style>
 </head>
 <body>
@@ -227,10 +267,14 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
   <img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXgAAACFCAYAAABR5uPVAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE7mlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgOS4xLWMwMDEgNzkuMTQ2Mjg5OSwgMjAyMy8wNi8yNS0yMDowMTo1NSAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI1LjMgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyMy0xMi0yMVQxNjozOTowMCswMTowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjMtMTItMjFUMTY6NDY6MTIrMDE6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjMtMTItMjFUMTY6NDY6MTIrMDE6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjc2MTM4MmRlLTBiMmUtOTk0OS1hNmYzLWQyNjIxNjMwNmI4NyIgeG1wTU06RG9jdW1lbnRJRD0i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" alt="Luminum">
   <div class="title">LumGis <span>Leuchtenkarte</span></div>
   <span class="badge" title="Die Excel-Datei wird nur gelesen, nie verändert.">Nur Ansicht</span>
+  <div class="modes" id="modes" hidden>
+    <button data-mode="view" class="active" title="Leuchten ansehen, filtern und suchen">Ansehen</button>
+    <button data-mode="capture" title="Fehlende Koordinaten auf der Karte setzen">Erfassen</button>
+  </div>
   <div class="file" id="fileName"></div>
   <button id="btnReload" hidden title="Excel-Datei erneut einlesen, z. B. nach Änderungen in Excel">Neu laden</button>
   <button id="btnOpen" hidden>Andere Datei …</button>
-  <span class="version">v1.0.1</span>
+  <span class="version">v1.1.0</span>
 </header>
 
 <main class="start" id="start">
@@ -256,6 +300,7 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
 
 <div class="app" id="app" hidden>
   <aside class="sidebar">
+   <div id="viewSide">
     <div class="summary" id="summary"></div>
 
     <div class="field">
@@ -273,6 +318,22 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
       <h3>Filter</h3>
       <div id="filters"></div>
     </div>
+   </div>
+
+   <div id="captureSide" hidden>
+    <div class="summary" id="capSummary"></div>
+    <p class="hint small">Leuchte wählen, dann auf die Karte klicken. Danach geht es automatisch zur nächsten.
+      Gesetzte Punkte lassen sich verschieben. Tipp: <b>Luftbild</b>.</p>
+    <div class="capactions">
+      <button class="btn-primary" id="btnCapSave" type="button">Koordinatenliste speichern</button>
+      <button class="linkbtn" id="btnCapClear" type="button">Alle gesetzten Positionen verwerfen</button>
+    </div>
+    <div class="field">
+      <label for="capSearch">Suche</label>
+      <input type="search" id="capSearch" placeholder="Lichtpunkt-Nr. oder Strasse" autocomplete="off">
+    </div>
+    <div id="capList"></div>
+   </div>
   </aside>
 
   <section class="content">
@@ -285,6 +346,7 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
     <div class="panel" id="panel-map">
       <div id="map"></div>
       <div class="basemaps" id="basemaps"></div>
+      <div class="capbanner" id="capBanner" hidden></div>
       <div class="tilewarn" id="tilewarn" hidden>
         Hintergrundkarte nicht erreichbar (keine Internetverbindung?). Die Leuchten werden trotzdem angezeigt.
       </div>
@@ -688,14 +750,20 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
     };
   }
 
+  /** WGS84 (Kartenklick) -> LV95 [E, N], fuer den Modus «Erfassen». */
+  function toLV95(proj4, lat, lon) {
+    return proj4(EPSG_2056, "EPSG:4326").inverse([lon, lat]);
+  }
+
   return {
+    toLV95, LV95_E_RANGE, LV95_N_RANGE,
     SHEET_NAME, HEADER_ROW, ID_COL, ID_COL_NEU, ID_COL_PROJEKT, ID_COLS,
     COORD_X_COL, COORD_Y_COL, COORD_COL, COORD_COLS, STREET_COL, EMPTY_VALS,
     LumGisError, parseWorkbook, buildReport, fmtNum, pyFloatRepr, excelDateToText, toNumber,
   };
 });
 </script>
-<script>const LUMGIS_VERSION = "1.0.1";</script>
+<script>const LUMGIS_VERSION = "1.1.0";</script>
 <script>/* LumGis Oberflaeche: Datei oeffnen, Karte, Filter, Suche, Tabelle, Pruefbericht. */
 (function () {
   "use strict";
@@ -764,9 +832,12 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
   const state = {
     model: null, report: null, handle: null, fileName: "",
     filters: new Map(), search: "", colorCol: null,
-    filterable: [], visible: [], tab: "map",
+    filterable: [], visible: [], tab: "map", mode: "view",
   };
   let map = null, markerLayer = null, legendCtl = null, baseLayer = null, pulseMarker = null;
+  let contextLayer = null, captureLayer = null;
+  // Modus «Erfassen»: neu gesetzte Positionen fuer Leuchten ohne gueltige Koordinaten
+  const capture = { items: new Map(), placing: null, transferred: 0 };
   const markers = []; // parallel zu state.model.rows (null ohne Koordinaten)
 
   // ---------- Datei oeffnen ----------
@@ -853,10 +924,11 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
     $("app").hidden = false;
     $("btnOpen").hidden = false;
     $("btnReload").hidden = false;
+    $("modes").hidden = false;
     $("fileName").textContent = state.fileName;
     document.title = `${state.fileName} – LumGis`;
 
-    // Filterbare Spalten wie in app.py (2..150 verschiedene Werte), ohne IDs und Koordinaten
+    // Filterbare Spalten wie in archiv/streamlit/app.py (2..150 verschiedene Werte), ohne IDs und Koordinaten
     const skip = new Set([...C.ID_COLS, ...C.COORD_COLS]);
     state.filterable = model.columns.filter((col) => {
       if (skip.has(col)) return false;
@@ -875,8 +947,10 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
     initMap();
     buildMarkers();
     renderReport();
+    loadCapture();
     apply({ fit: true });
     if (firstLoad) switchTab("map");
+    setMode(state.mode);
   }
 
   function buildColorSelect() {
@@ -965,7 +1039,10 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
       (rows.length !== total ? `<div class="muted">Auswahl aus ${fmtCount(total)} Leuchten</div>` : "") +
       (issues.length
         ? `<div class="issues">${issues.join(" · ")} – <a data-goto="report">Prüfbericht</a></div>`
-        : `<div class="ok">Alle Leuchten haben gültige Koordinaten.</div>`);
+        : `<div class="ok">Alle Leuchten haben gültige Koordinaten.</div>`) +
+      (capture.items.size
+        ? `<div class="issues">${fmtCount(capture.items.size)} ${capture.items.size === 1 ? "erfasste Position" : "erfasste Positionen"} noch nicht in Excel übernommen – <a data-mode="capture">Erfassen</a></div>`
+        : "");
   }
 
   function renderChips(rows) {
@@ -995,6 +1072,9 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
     if (map) return;
     map = L.map("map", { preferCanvas: true, zoomControl: true }).setView([46.8, 8.2], 8);
     markerLayer = L.layerGroup().addTo(map);
+    contextLayer = L.layerGroup();
+    captureLayer = L.layerGroup();
+    map.on("click", (e) => { if (state.mode === "capture" && capture.placing) placeAt(e.latlng); });
     const wanted = store.get("basemap", "strasse");
     $("basemaps").innerHTML = Object.entries(BASEMAPS)
       .map(([k, b]) => `<button data-basemap="${k}">${b.label}</button>`).join("");
@@ -1025,8 +1105,13 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
   function buildMarkers() {
     markers.length = 0;
     markerLayer.clearLayers();
+    contextLayer.clearLayers();
     for (const r of state.model.rows) {
       if (r.lat == null) { markers.push(null); continue; }
+      // Bestehende Leuchten als Orientierung im Modus «Erfassen» (nicht anklickbar)
+      contextLayer.addLayer(L.circleMarker([r.lat, r.lon], {
+        radius: 5, weight: 1.5, color: "#111827", fillColor: "#ffffff", fillOpacity: 0.9, interactive: false,
+      }));
       const mk = L.circleMarker([r.lat, r.lon], { radius: 6, weight: 1, color: "#1f2937", fillOpacity: 0.9 });
       mk.row = r;
       mk.bindTooltip(() => esc(rowTitle(r)) + (r.values[C.STREET_COL] ? " | " + esc(r.values[C.STREET_COL]) : ""),
@@ -1175,6 +1260,234 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
     $("copyMsg").textContent = `${fmtCount(text.split("\n").length - 1)} Zeilen kopiert.`;
   }
 
+  // ---------- Modus «Erfassen» ----------
+  const captureKey = () => "capture." + state.fileName;
+  const itemKey = (r) => rowTitle(r) + "|" + r.excelRow;
+  const candidates = () => state.model.rows.filter((r) => r.lat == null);
+
+  function saveCapture() {
+    store.set(captureKey(), [...capture.items.values()].map(({ row, marker, ...it }) => it));
+  }
+
+  /** Gespeicherte Positionen laden; bereits in Excel uebernommene fallen weg. */
+  function loadCapture() {
+    capture.items.clear();
+    capture.placing = null;
+    capture.transferred = 0;
+    const byTitle = new Map();
+    for (const r of state.model.rows) {
+      const t = rowTitle(r);
+      byTitle.set(t, byTitle.has(t) ? null : r); // null = Nummer mehrfach vorhanden
+    }
+    for (const it of store.get(captureKey(), []) || []) {
+      const row = state.model.rows.find((r) => itemKey(r) === it.key) || byTitle.get(it.title) || null;
+      if (row && row.lat != null) { capture.transferred++; continue; }
+      const item = { ...it, row, orphan: !row };
+      if (row) { item.key = itemKey(row); item.excelRow = row.excelRow; }
+      capture.items.set(item.key, item);
+    }
+    saveCapture();
+    renderCaptureMarkers();
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    const cap = mode === "capture";
+    for (const b of $("modes").querySelectorAll("button")) b.classList.toggle("active", b.dataset.mode === mode);
+    $("viewSide").hidden = cap;
+    $("captureSide").hidden = !cap;
+    $("chipbar").hidden = cap;
+    $("tabs").hidden = cap;
+    if (cap) switchTab("map");
+    if (!map) return;
+    if (cap) {
+      map.removeLayer(markerLayer);
+      if (legendCtl) { legendCtl.remove(); legendCtl = null; }
+      contextLayer.addTo(map);
+      captureLayer.addTo(map);
+      renderCapture();
+    } else {
+      capture.placing = null;
+      map.removeLayer(contextLayer);
+      map.removeLayer(captureLayer);
+      markerLayer.addTo(map);
+      apply();
+    }
+    updateBanner();
+  }
+
+  function captureIcon(item) {
+    const sel = capture.placing === item.key ? " sel" : "";
+    return L.divIcon({ className: "", html: `<div class="capdot${sel}"></div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
+  }
+
+  function renderCaptureMarkers() {
+    if (!captureLayer) return;
+    captureLayer.clearLayers();
+    for (const item of capture.items.values()) {
+      const mk = L.marker([item.lat, item.lon], { icon: captureIcon(item), draggable: true, keyboard: false });
+      mk.bindTooltip(esc(item.title), { direction: "top", offset: [0, -8] });
+      mk.on("dragend", (e) => {
+        const p = e.target.getLatLng();
+        setPosition(item, p.lat, p.lng);
+        saveCapture();
+        renderCapture();
+      });
+      mk.on("click", (e) => { L.DomEvent.stopPropagation(e); startPlacing(item.key); });
+      item.marker = mk;
+      captureLayer.addLayer(mk);
+    }
+  }
+
+  function setPosition(item, lat, lon) {
+    const [e, n] = C.toLV95(proj4, lat, lon);
+    Object.assign(item, { lat, lon, e: Math.round(e * 100) / 100, n: Math.round(n * 100) / 100 });
+  }
+
+  function startPlacing(key) {
+    capture.placing = capture.placing === key ? null : key;
+    if (capture.placing) {
+      const item = capture.items.get(key);
+      if (item) {
+        map.setView([item.lat, item.lon], Math.max(map.getZoom(), 18), { animate: false });
+      } else {
+        // Ohne Position: zur Leuchte mit Koordinaten springen, die in Excel am naechsten liegt
+        const r = candidates().find((c) => itemKey(c) === key);
+        const near = r && nearestByRow(r.excelRow);
+        if (near) map.setView([near.lat, near.lon], Math.max(map.getZoom(), 18), { animate: false });
+      }
+    }
+    renderCapture();
+  }
+
+  function nearestByRow(excelRow) {
+    let best = null;
+    for (const r of state.model.rows) {
+      if (r.lat == null) continue;
+      if (!best || Math.abs(r.excelRow - excelRow) < Math.abs(best.excelRow - excelRow)) best = r;
+    }
+    return best;
+  }
+
+  function placeAt(latlng) {
+    const key = capture.placing;
+    let item = capture.items.get(key);
+    if (!item) {
+      const r = candidates().find((c) => itemKey(c) === key);
+      if (!r) return;
+      item = { key, title: rowTitle(r), excelRow: r.excelRow, street: r.values[C.STREET_COL] || "", row: r };
+      capture.items.set(key, item);
+    }
+    setPosition(item, latlng.lat, latlng.lng);
+    saveCapture();
+    // Automatisch zur naechsten Leuchte ohne Position (in Excel-Reihenfolge)
+    const open = candidates().filter((r) => !capture.items.has(itemKey(r)));
+    const next = open.find((r) => r.excelRow > item.excelRow) || open[0] || null;
+    capture.placing = next ? itemKey(next) : null;
+    renderCaptureMarkers();
+    renderCapture();
+    if (!next) $("capBanner").textContent = "Alle Leuchten ohne Koordinaten sind gesetzt. Jetzt «Koordinatenliste speichern».";
+  }
+
+  function updateBanner() {
+    const el = $("capBanner");
+    $("map").classList.toggle("placing", state.mode === "capture" && !!capture.placing);
+    if (state.mode !== "capture") { el.hidden = true; return; }
+    if (capture.placing) {
+      const title = capture.placing.split("|")[0];
+      el.innerHTML = `Auf die Karte klicken, um <b>${esc(title)}</b> zu setzen · Esc = abbrechen`;
+    } else {
+      el.textContent = "Links eine Leuchte wählen, dann auf die Karte klicken.";
+    }
+    el.hidden = false;
+  }
+
+  function capReason(r) {
+    const raw = C.COORD_COLS.filter((c) => state.model.columns.includes(c) && !isEmpty(r.values[c]))
+      .map((c) => r.values[c]).join(" / ");
+    return raw ? `nicht lesbar: ${raw}` : "ohne Koordinaten";
+  }
+
+  function renderCapture() {
+    if (!state.model) return;
+    const q = $("capSearch").value.trim().toLowerCase();
+    const match = (title, street) => !q || title.toLowerCase().includes(q) || String(street).toLowerCase().includes(q);
+    const all = candidates();
+    const open = all.filter((r) => !capture.items.has(itemKey(r)));
+    const placed = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
+
+    $("capSummary").innerHTML =
+      `<div class="big"><b>${fmtCount(placed.length)}</b> von ${fmtCount(open.length + placed.length)} Leuchten gesetzt</div>` +
+      `<div class="muted">Erfasst werden nur Leuchten ohne gültige Koordinaten.</div>` +
+      (capture.transferred ? `<div class="ok">${fmtCount(capture.transferred)} ${capture.transferred === 1 ? "Position ist" : "Positionen sind"} inzwischen in Excel übernommen.</div>` : "");
+
+    const entry = (key, title, sub, cls, btn) =>
+      `<div class="capitem ${cls}${capture.placing === key ? " placing" : ""}" data-key="${esc(key)}">` +
+      `<span class="t">${esc(title)}</span><small>${sub}</small>${btn}</div>`;
+    const openHtml = open.filter((r) => match(rowTitle(r), r.values[C.STREET_COL] || "")).map((r) =>
+      entry(itemKey(r), rowTitle(r), `${esc(r.values[C.STREET_COL] || "")} · Zeile ${r.excelRow} · ${esc(capReason(r))}`, "open", ""));
+    const placedHtml = placed.filter((it) => match(it.title, it.street || "")).map((it) =>
+      entry(it.key, it.title,
+        `${esc(it.street || "")}${it.excelRow ? " · Zeile " + it.excelRow : ""} · X ${fmtCount(it.e)} / Y ${fmtCount(it.n)}` +
+        (it.orphan ? " · <b>nicht mehr in der Datei</b>" : ""),
+        "done", `<button class="undo" data-undo="${esc(it.key)}" title="Position entfernen">↩</button>`));
+    const none = "<p class='muted'>Keine Treffer.</p>";
+    $("capList").innerHTML =
+      (open.length ? `<div class="caphead">Noch nicht gesetzt <span>${fmtCount(open.length)}</span></div>${openHtml.join("") || none}` : "") +
+      (placed.length ? `<div class="caphead">Gesetzt <span>${fmtCount(placed.length)}</span></div>${placedHtml.join("") || none}` : "") +
+      (!all.length && !placed.length ? `<p class="ok">Alle Leuchten haben gültige Koordinaten. Nichts zu erfassen.</p>` : "");
+    $("btnCapSave").disabled = !placed.length;
+    $("btnCapClear").hidden = !placed.length;
+    const sel = $("capList").querySelector(".placing");
+    if (sel) sel.scrollIntoView({ block: "nearest" });
+    for (const it of capture.items.values()) if (it.marker) it.marker.setIcon(captureIcon(it));
+    updateBanner();
+    renderSummary(state.visible.length ? state.visible : state.model.rows);
+  }
+
+  function removePosition(key) {
+    capture.items.delete(key);
+    if (capture.placing === key) capture.placing = null;
+    saveCapture();
+    renderCaptureMarkers();
+    renderCapture();
+  }
+
+  /** Erkennt aus den vorhandenen Daten, ob «Koordinate X» den Ost- oder den Nordwert enthaelt. */
+  function xIsEast() {
+    let east = 0, north = 0;
+    for (const r of state.model.rows) {
+      if (!r.lv95 || !state.model.columns.includes(C.COORD_X_COL)) continue;
+      const x = C.toNumber(r.values[C.COORD_X_COL]);
+      if (Math.abs(x - r.lv95[0]) < 0.001) east++;
+      else if (Math.abs(x - r.lv95[1]) < 0.001) north++;
+    }
+    return east >= north;
+  }
+
+  function saveCoordinateList() {
+    const m = state.model;
+    const idCols = C.ID_COLS.filter((c) => m.columns.includes(c));
+    const hasStreet = m.columns.includes(C.STREET_COL);
+    const eastInX = xIsEast();
+    const head = ["Excel-Zeile", ...idCols, ...(hasStreet ? [C.STREET_COL] : []), C.COORD_X_COL, C.COORD_Y_COL];
+    const rows = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0)).map((it) => [
+      it.excelRow || "",
+      ...idCols.map((c) => (it.row ? it.row.values[c] : c === C.ID_COL ? it.title : "")),
+      ...(hasStreet ? [it.street || ""] : []),
+      eastInX ? it.e : it.n,
+      eastInX ? it.n : it.e,
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+    ws["!cols"] = head.map((h) => ({ wch: Math.max(12, h.length + 2) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Koordinaten");
+    const base = state.fileName.replace(/\.(xlsx|xlsm)$/i, "");
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    XLSX.writeFile(wb, `${base}_Koordinaten_${stamp}.xlsx`);
+  }
+
   // ---------- Tabs ----------
   function switchTab(tab) {
     state.tab = tab;
@@ -1266,6 +1579,28 @@ parse_Primary(n.content)}catch(l){}a="/EncryptionInfo";n=Qe.find(e,a);if(!n||!n.
     $("summary").addEventListener("click", (e) => { if (e.target.dataset.goto) switchTab(e.target.dataset.goto); });
     $("basemaps").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setBasemap(b.dataset.basemap); });
     $("report").addEventListener("click", (e) => { if (e.target.id === "btnCopy") copyDetails(); });
+
+    $("modes").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setMode(b.dataset.mode); });
+    $("summary").addEventListener("click", (e) => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
+    $("capSearch").addEventListener("input", () => renderCapture());
+    $("capList").addEventListener("click", (e) => {
+      const undo = e.target.closest("[data-undo]");
+      if (undo) { removePosition(undo.dataset.undo); return; }
+      const it = e.target.closest(".capitem");
+      if (it) startPlacing(it.dataset.key);
+    });
+    $("btnCapSave").addEventListener("click", () => saveCoordinateList());
+    $("btnCapClear").addEventListener("click", () => {
+      if (!confirm(`Alle ${capture.items.size} gesetzten Positionen verwerfen?`)) return;
+      capture.items.clear();
+      capture.placing = null;
+      saveCapture();
+      renderCaptureMarkers();
+      renderCapture();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && state.mode === "capture" && capture.placing) { capture.placing = null; renderCapture(); }
+    });
   }
 
   async function showRecent() {

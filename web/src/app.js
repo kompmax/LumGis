@@ -66,9 +66,12 @@
   const state = {
     model: null, report: null, handle: null, fileName: "",
     filters: new Map(), search: "", colorCol: null,
-    filterable: [], visible: [], tab: "map",
+    filterable: [], visible: [], tab: "map", mode: "view",
   };
   let map = null, markerLayer = null, legendCtl = null, baseLayer = null, pulseMarker = null;
+  let contextLayer = null, captureLayer = null;
+  // Modus «Erfassen»: neu gesetzte Positionen fuer Leuchten ohne gueltige Koordinaten
+  const capture = { items: new Map(), placing: null, transferred: 0 };
   const markers = []; // parallel zu state.model.rows (null ohne Koordinaten)
 
   // ---------- Datei oeffnen ----------
@@ -155,10 +158,11 @@
     $("app").hidden = false;
     $("btnOpen").hidden = false;
     $("btnReload").hidden = false;
+    $("modes").hidden = false;
     $("fileName").textContent = state.fileName;
     document.title = `${state.fileName} – LumGis`;
 
-    // Filterbare Spalten wie in app.py (2..150 verschiedene Werte), ohne IDs und Koordinaten
+    // Filterbare Spalten wie in archiv/streamlit/app.py (2..150 verschiedene Werte), ohne IDs und Koordinaten
     const skip = new Set([...C.ID_COLS, ...C.COORD_COLS]);
     state.filterable = model.columns.filter((col) => {
       if (skip.has(col)) return false;
@@ -177,8 +181,10 @@
     initMap();
     buildMarkers();
     renderReport();
+    loadCapture();
     apply({ fit: true });
     if (firstLoad) switchTab("map");
+    setMode(state.mode);
   }
 
   function buildColorSelect() {
@@ -267,7 +273,10 @@
       (rows.length !== total ? `<div class="muted">Auswahl aus ${fmtCount(total)} Leuchten</div>` : "") +
       (issues.length
         ? `<div class="issues">${issues.join(" · ")} – <a data-goto="report">Prüfbericht</a></div>`
-        : `<div class="ok">Alle Leuchten haben gültige Koordinaten.</div>`);
+        : `<div class="ok">Alle Leuchten haben gültige Koordinaten.</div>`) +
+      (capture.items.size
+        ? `<div class="issues">${fmtCount(capture.items.size)} ${capture.items.size === 1 ? "erfasste Position" : "erfasste Positionen"} noch nicht in Excel übernommen – <a data-mode="capture">Erfassen</a></div>`
+        : "");
   }
 
   function renderChips(rows) {
@@ -297,6 +306,9 @@
     if (map) return;
     map = L.map("map", { preferCanvas: true, zoomControl: true }).setView([46.8, 8.2], 8);
     markerLayer = L.layerGroup().addTo(map);
+    contextLayer = L.layerGroup();
+    captureLayer = L.layerGroup();
+    map.on("click", (e) => { if (state.mode === "capture" && capture.placing) placeAt(e.latlng); });
     const wanted = store.get("basemap", "strasse");
     $("basemaps").innerHTML = Object.entries(BASEMAPS)
       .map(([k, b]) => `<button data-basemap="${k}">${b.label}</button>`).join("");
@@ -327,8 +339,13 @@
   function buildMarkers() {
     markers.length = 0;
     markerLayer.clearLayers();
+    contextLayer.clearLayers();
     for (const r of state.model.rows) {
       if (r.lat == null) { markers.push(null); continue; }
+      // Bestehende Leuchten als Orientierung im Modus «Erfassen» (nicht anklickbar)
+      contextLayer.addLayer(L.circleMarker([r.lat, r.lon], {
+        radius: 5, weight: 1.5, color: "#111827", fillColor: "#ffffff", fillOpacity: 0.9, interactive: false,
+      }));
       const mk = L.circleMarker([r.lat, r.lon], { radius: 6, weight: 1, color: "#1f2937", fillOpacity: 0.9 });
       mk.row = r;
       mk.bindTooltip(() => esc(rowTitle(r)) + (r.values[C.STREET_COL] ? " | " + esc(r.values[C.STREET_COL]) : ""),
@@ -477,6 +494,234 @@
     $("copyMsg").textContent = `${fmtCount(text.split("\n").length - 1)} Zeilen kopiert.`;
   }
 
+  // ---------- Modus «Erfassen» ----------
+  const captureKey = () => "capture." + state.fileName;
+  const itemKey = (r) => rowTitle(r) + "|" + r.excelRow;
+  const candidates = () => state.model.rows.filter((r) => r.lat == null);
+
+  function saveCapture() {
+    store.set(captureKey(), [...capture.items.values()].map(({ row, marker, ...it }) => it));
+  }
+
+  /** Gespeicherte Positionen laden; bereits in Excel uebernommene fallen weg. */
+  function loadCapture() {
+    capture.items.clear();
+    capture.placing = null;
+    capture.transferred = 0;
+    const byTitle = new Map();
+    for (const r of state.model.rows) {
+      const t = rowTitle(r);
+      byTitle.set(t, byTitle.has(t) ? null : r); // null = Nummer mehrfach vorhanden
+    }
+    for (const it of store.get(captureKey(), []) || []) {
+      const row = state.model.rows.find((r) => itemKey(r) === it.key) || byTitle.get(it.title) || null;
+      if (row && row.lat != null) { capture.transferred++; continue; }
+      const item = { ...it, row, orphan: !row };
+      if (row) { item.key = itemKey(row); item.excelRow = row.excelRow; }
+      capture.items.set(item.key, item);
+    }
+    saveCapture();
+    renderCaptureMarkers();
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    const cap = mode === "capture";
+    for (const b of $("modes").querySelectorAll("button")) b.classList.toggle("active", b.dataset.mode === mode);
+    $("viewSide").hidden = cap;
+    $("captureSide").hidden = !cap;
+    $("chipbar").hidden = cap;
+    $("tabs").hidden = cap;
+    if (cap) switchTab("map");
+    if (!map) return;
+    if (cap) {
+      map.removeLayer(markerLayer);
+      if (legendCtl) { legendCtl.remove(); legendCtl = null; }
+      contextLayer.addTo(map);
+      captureLayer.addTo(map);
+      renderCapture();
+    } else {
+      capture.placing = null;
+      map.removeLayer(contextLayer);
+      map.removeLayer(captureLayer);
+      markerLayer.addTo(map);
+      apply();
+    }
+    updateBanner();
+  }
+
+  function captureIcon(item) {
+    const sel = capture.placing === item.key ? " sel" : "";
+    return L.divIcon({ className: "", html: `<div class="capdot${sel}"></div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
+  }
+
+  function renderCaptureMarkers() {
+    if (!captureLayer) return;
+    captureLayer.clearLayers();
+    for (const item of capture.items.values()) {
+      const mk = L.marker([item.lat, item.lon], { icon: captureIcon(item), draggable: true, keyboard: false });
+      mk.bindTooltip(esc(item.title), { direction: "top", offset: [0, -8] });
+      mk.on("dragend", (e) => {
+        const p = e.target.getLatLng();
+        setPosition(item, p.lat, p.lng);
+        saveCapture();
+        renderCapture();
+      });
+      mk.on("click", (e) => { L.DomEvent.stopPropagation(e); startPlacing(item.key); });
+      item.marker = mk;
+      captureLayer.addLayer(mk);
+    }
+  }
+
+  function setPosition(item, lat, lon) {
+    const [e, n] = C.toLV95(proj4, lat, lon);
+    Object.assign(item, { lat, lon, e: Math.round(e * 100) / 100, n: Math.round(n * 100) / 100 });
+  }
+
+  function startPlacing(key) {
+    capture.placing = capture.placing === key ? null : key;
+    if (capture.placing) {
+      const item = capture.items.get(key);
+      if (item) {
+        map.setView([item.lat, item.lon], Math.max(map.getZoom(), 18), { animate: false });
+      } else {
+        // Ohne Position: zur Leuchte mit Koordinaten springen, die in Excel am naechsten liegt
+        const r = candidates().find((c) => itemKey(c) === key);
+        const near = r && nearestByRow(r.excelRow);
+        if (near) map.setView([near.lat, near.lon], Math.max(map.getZoom(), 18), { animate: false });
+      }
+    }
+    renderCapture();
+  }
+
+  function nearestByRow(excelRow) {
+    let best = null;
+    for (const r of state.model.rows) {
+      if (r.lat == null) continue;
+      if (!best || Math.abs(r.excelRow - excelRow) < Math.abs(best.excelRow - excelRow)) best = r;
+    }
+    return best;
+  }
+
+  function placeAt(latlng) {
+    const key = capture.placing;
+    let item = capture.items.get(key);
+    if (!item) {
+      const r = candidates().find((c) => itemKey(c) === key);
+      if (!r) return;
+      item = { key, title: rowTitle(r), excelRow: r.excelRow, street: r.values[C.STREET_COL] || "", row: r };
+      capture.items.set(key, item);
+    }
+    setPosition(item, latlng.lat, latlng.lng);
+    saveCapture();
+    // Automatisch zur naechsten Leuchte ohne Position (in Excel-Reihenfolge)
+    const open = candidates().filter((r) => !capture.items.has(itemKey(r)));
+    const next = open.find((r) => r.excelRow > item.excelRow) || open[0] || null;
+    capture.placing = next ? itemKey(next) : null;
+    renderCaptureMarkers();
+    renderCapture();
+    if (!next) $("capBanner").textContent = "Alle Leuchten ohne Koordinaten sind gesetzt. Jetzt «Koordinatenliste speichern».";
+  }
+
+  function updateBanner() {
+    const el = $("capBanner");
+    $("map").classList.toggle("placing", state.mode === "capture" && !!capture.placing);
+    if (state.mode !== "capture") { el.hidden = true; return; }
+    if (capture.placing) {
+      const title = capture.placing.split("|")[0];
+      el.innerHTML = `Auf die Karte klicken, um <b>${esc(title)}</b> zu setzen · Esc = abbrechen`;
+    } else {
+      el.textContent = "Links eine Leuchte wählen, dann auf die Karte klicken.";
+    }
+    el.hidden = false;
+  }
+
+  function capReason(r) {
+    const raw = C.COORD_COLS.filter((c) => state.model.columns.includes(c) && !isEmpty(r.values[c]))
+      .map((c) => r.values[c]).join(" / ");
+    return raw ? `nicht lesbar: ${raw}` : "ohne Koordinaten";
+  }
+
+  function renderCapture() {
+    if (!state.model) return;
+    const q = $("capSearch").value.trim().toLowerCase();
+    const match = (title, street) => !q || title.toLowerCase().includes(q) || String(street).toLowerCase().includes(q);
+    const all = candidates();
+    const open = all.filter((r) => !capture.items.has(itemKey(r)));
+    const placed = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
+
+    $("capSummary").innerHTML =
+      `<div class="big"><b>${fmtCount(placed.length)}</b> von ${fmtCount(open.length + placed.length)} Leuchten gesetzt</div>` +
+      `<div class="muted">Erfasst werden nur Leuchten ohne gültige Koordinaten.</div>` +
+      (capture.transferred ? `<div class="ok">${fmtCount(capture.transferred)} ${capture.transferred === 1 ? "Position ist" : "Positionen sind"} inzwischen in Excel übernommen.</div>` : "");
+
+    const entry = (key, title, sub, cls, btn) =>
+      `<div class="capitem ${cls}${capture.placing === key ? " placing" : ""}" data-key="${esc(key)}">` +
+      `<span class="t">${esc(title)}</span><small>${sub}</small>${btn}</div>`;
+    const openHtml = open.filter((r) => match(rowTitle(r), r.values[C.STREET_COL] || "")).map((r) =>
+      entry(itemKey(r), rowTitle(r), `${esc(r.values[C.STREET_COL] || "")} · Zeile ${r.excelRow} · ${esc(capReason(r))}`, "open", ""));
+    const placedHtml = placed.filter((it) => match(it.title, it.street || "")).map((it) =>
+      entry(it.key, it.title,
+        `${esc(it.street || "")}${it.excelRow ? " · Zeile " + it.excelRow : ""} · X ${fmtCount(it.e)} / Y ${fmtCount(it.n)}` +
+        (it.orphan ? " · <b>nicht mehr in der Datei</b>" : ""),
+        "done", `<button class="undo" data-undo="${esc(it.key)}" title="Position entfernen">↩</button>`));
+    const none = "<p class='muted'>Keine Treffer.</p>";
+    $("capList").innerHTML =
+      (open.length ? `<div class="caphead">Noch nicht gesetzt <span>${fmtCount(open.length)}</span></div>${openHtml.join("") || none}` : "") +
+      (placed.length ? `<div class="caphead">Gesetzt <span>${fmtCount(placed.length)}</span></div>${placedHtml.join("") || none}` : "") +
+      (!all.length && !placed.length ? `<p class="ok">Alle Leuchten haben gültige Koordinaten. Nichts zu erfassen.</p>` : "");
+    $("btnCapSave").disabled = !placed.length;
+    $("btnCapClear").hidden = !placed.length;
+    const sel = $("capList").querySelector(".placing");
+    if (sel) sel.scrollIntoView({ block: "nearest" });
+    for (const it of capture.items.values()) if (it.marker) it.marker.setIcon(captureIcon(it));
+    updateBanner();
+    renderSummary(state.visible.length ? state.visible : state.model.rows);
+  }
+
+  function removePosition(key) {
+    capture.items.delete(key);
+    if (capture.placing === key) capture.placing = null;
+    saveCapture();
+    renderCaptureMarkers();
+    renderCapture();
+  }
+
+  /** Erkennt aus den vorhandenen Daten, ob «Koordinate X» den Ost- oder den Nordwert enthaelt. */
+  function xIsEast() {
+    let east = 0, north = 0;
+    for (const r of state.model.rows) {
+      if (!r.lv95 || !state.model.columns.includes(C.COORD_X_COL)) continue;
+      const x = C.toNumber(r.values[C.COORD_X_COL]);
+      if (Math.abs(x - r.lv95[0]) < 0.001) east++;
+      else if (Math.abs(x - r.lv95[1]) < 0.001) north++;
+    }
+    return east >= north;
+  }
+
+  function saveCoordinateList() {
+    const m = state.model;
+    const idCols = C.ID_COLS.filter((c) => m.columns.includes(c));
+    const hasStreet = m.columns.includes(C.STREET_COL);
+    const eastInX = xIsEast();
+    const head = ["Excel-Zeile", ...idCols, ...(hasStreet ? [C.STREET_COL] : []), C.COORD_X_COL, C.COORD_Y_COL];
+    const rows = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0)).map((it) => [
+      it.excelRow || "",
+      ...idCols.map((c) => (it.row ? it.row.values[c] : c === C.ID_COL ? it.title : "")),
+      ...(hasStreet ? [it.street || ""] : []),
+      eastInX ? it.e : it.n,
+      eastInX ? it.n : it.e,
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+    ws["!cols"] = head.map((h) => ({ wch: Math.max(12, h.length + 2) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Koordinaten");
+    const base = state.fileName.replace(/\.(xlsx|xlsm)$/i, "");
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    XLSX.writeFile(wb, `${base}_Koordinaten_${stamp}.xlsx`);
+  }
+
   // ---------- Tabs ----------
   function switchTab(tab) {
     state.tab = tab;
@@ -568,6 +813,28 @@
     $("summary").addEventListener("click", (e) => { if (e.target.dataset.goto) switchTab(e.target.dataset.goto); });
     $("basemaps").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setBasemap(b.dataset.basemap); });
     $("report").addEventListener("click", (e) => { if (e.target.id === "btnCopy") copyDetails(); });
+
+    $("modes").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setMode(b.dataset.mode); });
+    $("summary").addEventListener("click", (e) => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
+    $("capSearch").addEventListener("input", () => renderCapture());
+    $("capList").addEventListener("click", (e) => {
+      const undo = e.target.closest("[data-undo]");
+      if (undo) { removePosition(undo.dataset.undo); return; }
+      const it = e.target.closest(".capitem");
+      if (it) startPlacing(it.dataset.key);
+    });
+    $("btnCapSave").addEventListener("click", () => saveCoordinateList());
+    $("btnCapClear").addEventListener("click", () => {
+      if (!confirm(`Alle ${capture.items.size} gesetzten Positionen verwerfen?`)) return;
+      capture.items.clear();
+      capture.placing = null;
+      saveCapture();
+      renderCaptureMarkers();
+      renderCapture();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && state.mode === "capture" && capture.placing) { capture.placing = null; renderCapture(); }
+    });
   }
 
   async function showRecent() {

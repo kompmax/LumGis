@@ -13,6 +13,10 @@
   <img class="logo" src="{{LOGO}}" alt="Luminum">
   <div class="title">LumGis <span>Leuchtenkarte</span></div>
   <span class="badge" title="Die Excel-Datei wird nur gelesen, nie verändert.">Nur Ansicht</span>
+  <div class="modes" id="modes" hidden>
+    <button data-mode="view" class="active" title="Leuchten ansehen, filtern und suchen">Ansehen</button>
+    <button data-mode="capture" title="Fehlende Koordinaten auf der Karte setzen">Erfassen</button>
+  </div>
   <div class="file" id="fileName"></div>
   <button id="btnReload" hidden title="Excel-Datei erneut einlesen, z. B. nach Änderungen in Excel">Neu laden</button>
   <button id="btnOpen" hidden>Andere Datei …</button>
@@ -42,6 +46,7 @@
 
 <div class="app" id="app" hidden>
   <aside class="sidebar">
+   <div id="viewSide">
     <div class="summary" id="summary"></div>
 
     <div class="field">
@@ -59,6 +64,22 @@
       <h3>Filter</h3>
       <div id="filters"></div>
     </div>
+   </div>
+
+   <div id="captureSide" hidden>
+    <div class="summary" id="capSummary"></div>
+    <p class="hint small">Leuchte wählen, dann auf die Karte klicken. Danach geht es automatisch zur nächsten.
+      Gesetzte Punkte lassen sich verschieben. Tipp: <b>Luftbild</b>.</p>
+    <div class="capactions">
+      <button class="btn-primary" id="btnCapSave" type="button">Koordinatenliste speichern</button>
+      <button class="linkbtn" id="btnCapClear" type="button">Alle gesetzten Positionen verwerfen</button>
+    </div>
+    <div class="field">
+      <label for="capSearch">Suche</label>
+      <input type="search" id="capSearch" placeholder="Lichtpunkt-Nr. oder Strasse" autocomplete="off">
+    </div>
+    <div id="capList"></div>
+   </div>
   </aside>
 
   <section class="content">
@@ -71,6 +92,7 @@
     <div class="panel" id="panel-map">
       <div id="map"></div>
       <div class="basemaps" id="basemaps"></div>
+      <div class="capbanner" id="capBanner" hidden></div>
       <div class="tilewarn" id="tilewarn" hidden>
         Hintergrundkarte nicht erreichbar (keine Internetverbindung?). Die Leuchten werden trotzdem angezeigt.
       </div>

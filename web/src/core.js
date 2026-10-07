@@ -373,7 +373,13 @@
     };
   }
 
+  /** WGS84 (Kartenklick) -> LV95 [E, N], fuer den Modus «Erfassen». */
+  function toLV95(proj4, lat, lon) {
+    return proj4(EPSG_2056, "EPSG:4326").inverse([lon, lat]);
+  }
+
   return {
+    toLV95, LV95_E_RANGE, LV95_N_RANGE,
     SHEET_NAME, HEADER_ROW, ID_COL, ID_COL_NEU, ID_COL_PROJEKT, ID_COLS,
     COORD_X_COL, COORD_Y_COL, COORD_COL, COORD_COLS, STREET_COL, EMPTY_VALS,
     LumGisError, parseWorkbook, buildReport, fmtNum, pyFloatRepr, excelDateToText, toNumber,

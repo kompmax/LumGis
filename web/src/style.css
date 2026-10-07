@@ -212,3 +212,43 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
   .sidebar { width: auto; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--line); }
   .topbar .title span, .topbar .file { display: none; }
 }
+
+/* Modus-Umschalter Ansehen / Erfassen */
+.topbar .modes { display: flex; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.topbar .modes button { border: none; border-radius: 0; padding: 5px 14px; background: #fff; color: #111; }
+.topbar .modes button.active { background: var(--orange); color: #fff; }
+
+/* Erfassen */
+.hint.small { font-size: 12px; margin: 10px 0 0; }
+.capactions { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 10px; }
+.capactions .btn-primary { margin-top: 0; }
+.capactions .btn-primary:disabled { opacity: .45; cursor: default; filter: none; }
+.linkbtn { border: none; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 2px 0; font-size: 12px; }
+.caphead { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 6px; }
+.caphead span { color: var(--orange); }
+.capitem {
+  position: relative; background: var(--bg); border: 1px solid var(--line); border-left: 4px solid var(--line);
+  border-radius: 6px; padding: 6px 30px 6px 10px; margin-bottom: 4px; cursor: pointer;
+}
+.capitem:hover { border-color: var(--orange); }
+.capitem.open { border-left-color: #9ca3af; }
+.capitem.done { border-left-color: var(--ok); }
+.capitem.placing { border-color: var(--orange); border-left-color: var(--orange); background: var(--orange-soft); }
+.capitem .t { font-weight: 600; display: block; }
+.capitem small { color: var(--muted); display: block; word-break: break-word; }
+.capitem .undo {
+  position: absolute; top: 6px; right: 6px; border: none; background: none; cursor: pointer; font-size: 15px; color: var(--muted);
+}
+.capitem .undo:hover { color: var(--err-fg); }
+.capbanner {
+  position: absolute; top: 10px; left: 56px; right: 290px; z-index: 1000; background: #111; color: #fff;
+  border-radius: 8px; padding: 7px 12px; font-size: 13px; box-shadow: var(--shadow); text-align: center;
+}
+.capbanner b { color: #fdba74; }
+#map.placing, #map.placing .leaflet-interactive { cursor: crosshair; }
+.capdot {
+  width: 16px; height: 16px; border-radius: 50%; background: var(--orange); border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #7c2d12, 0 2px 6px rgba(0, 0, 0, .4);
+}
+.capdot.sel { box-shadow: 0 0 0 3px #111, 0 2px 6px rgba(0, 0, 0, .4); }
+@media (max-width: 760px) { .capbanner { right: 10px; top: 52px; } }
