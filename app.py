@@ -30,8 +30,15 @@ DATA_START_COL = 2
 ID_COL = "Lichtpunkt-Nr."
 ID_COL_NEU = "Lichtpunkt-Nr. neu"
 ID_COL_PROJEKT = "Lichtpunkt-Nr. Projekt"
-COORD_COL = "GPS Koordinaten (Breite, Länge)"
+COORD_X_COL = "Koordinate X"
+COORD_Y_COL = "Koordinate Y"
+COORD_COL = "GPS Koordinaten (Breite, Länge)"  # Altformat, nur noch Fallback
+COORD_COLS = (COORD_X_COL, COORD_Y_COL, COORD_COL)
 STREET_COL = "Strasse"
+
+# LV95-Wertebereiche — E und N ueberlappen nicht, daher eindeutig zuordenbar
+LV95_E_RANGE = (2_400_000, 2_900_000)
+LV95_N_RANGE = (1_000_000, 1_400_000)
 
 MAX_FILTER_UNIQUE = 150
 EMPTY_VALS = frozenset({"", "None", "nan"})
@@ -44,73 +51,79 @@ HEX_COLORS = [
 ]
 
 _TRANSFORMER = Transformer.from_crs("EPSG:2056", "EPSG:4326", always_xy=True)
-_COORD_RE = re.compile(r"[,;\s]+")
 
 
 # -----------------------------------------------
 # KOORDINATEN
 # -----------------------------------------------
-def _parse_coord_pair(val, coord_system="WGS84"):
-    """Return (lat, lon) for WGS84 or (easting, northing) for LV95, else None."""
-    s = str(val).strip()
-    if not s or s in EMPTY_VALS:
-        return None
-    parts = [p for p in _COORD_RE.split(s) if p]
-    if len(parts) < 2:
-        return None
-    try:
-        a, b = float(parts[0]), float(parts[1])
-    except (ValueError, TypeError):
-        return None
-    if coord_system == "LV95":
-        if 2_400_000 < a < 2_900_000 and 1_000_000 < b < 1_400_000:
-            return a, b
-    else:  # WGS84
-        if -90 <= a <= 90 and -180 <= b <= 180:
-            return a, b
-    return None
+def _to_number(series):
+    """Text -> float. Akzeptiert Tausender-Apostroph/Leerzeichen und Dezimalkomma."""
+    s = (
+        series.astype(str).str.strip()
+        .str.replace(r"[\s'’`]", "", regex=True)
+        .str.replace(",", ".", regex=False)
+    )
+    return pd.to_numeric(s, errors="coerce")
 
 
-def _add_coordinates(df, coord_system="WGS84"):
-    """Parse coordinates and convert to WGS84 if needed."""
-    df["_lat"] = pd.NA
-    df["_lon"] = pd.NA
-    if COORD_COL not in df.columns:
-        return df
+def _in_range(s, rng):
+    return s.notna() & (s > rng[0]) & (s < rng[1])
 
+
+def _coords_from_xy(df):
+    """LV95 aus 'Koordinate X' / 'Koordinate Y' -> (east, north) Serien.
+
+    Ob X Ost oder Nord ist (Schweizer Vermessung: Y=Ost, X=Nord; GIS oft umgekehrt),
+    wird pro Zeile am Wertebereich erkannt.
+    """
+    x = _to_number(df[COORD_X_COL])
+    y = _to_number(df[COORD_Y_COL])
+    east = x.where(_in_range(x, LV95_E_RANGE), y.where(_in_range(y, LV95_E_RANGE)))
+    north = y.where(_in_range(y, LV95_N_RANGE), x.where(_in_range(x, LV95_N_RANGE)))
+    return east, north
+
+
+def _coords_from_legacy(df):
+    """Altformat 'GPS Koordinaten': ein Zellwert mit zwei Zahlen, LV95 oder WGS84.
+
+    Liefert (lat, lon) fuer WGS84-Zeilen und (east, north) fuer LV95-Zeilen.
+    """
     raw = df[COORD_COL].str.strip()
-    non_empty = raw.notna() & ~raw.isin(EMPTY_VALS)
-    if not non_empty.any():
-        return df
-
-    # Extract the first two number groups from each coordinate string
-    extracted = raw[non_empty].str.extract(r"(-?\d[\d.]*)\s*[,;\s]+\s*(-?\d[\d.]*)")
+    extracted = raw.str.extract(r"(-?\d[\d.]*)\s*[,;\s]+\s*(-?\d[\d.]*)")
     a = pd.to_numeric(extracted[0], errors="coerce")
     b = pd.to_numeric(extracted[1], errors="coerce")
+    is_lv95 = _in_range(a, LV95_E_RANGE) & _in_range(b, LV95_N_RANGE)
+    is_wgs = (
+        a.notna() & b.notna() & ~is_lv95
+        & (a >= -90) & (a <= 90) & (b >= -180) & (b <= 180)
+    )
+    return a.where(is_wgs), b.where(is_wgs), a.where(is_lv95), b.where(is_lv95)
 
-    if coord_system == "LV95":
-        # LV95 bounds check, then convert to WGS84
-        ok = (
-            a.notna() & b.notna()
-            & (a > 2_400_000) & (a < 2_900_000)
-            & (b > 1_000_000) & (b < 1_400_000)
-        )
-        if not ok.any():
-            return df
-        lons, lats = _TRANSFORMER.transform(a[ok].values, b[ok].values)
-        df.loc[ok.index[ok], "_lat"] = lats
-        df.loc[ok.index[ok], "_lon"] = lons
-    else:
-        # WGS84: first value = Breite (lat), second = Länge (lon)
-        ok = (
-            a.notna() & b.notna()
-            & (a >= -90) & (a <= 90)
-            & (b >= -180) & (b <= 180)
-        )
-        if not ok.any():
-            return df
-        df.loc[ok.index[ok], "_lat"] = a[ok]
-        df.loc[ok.index[ok], "_lon"] = b[ok]
+
+def _add_coordinates(df):
+    """Setzt _lat/_lon (WGS84 fuer Leaflet). Quelle primaer LV95 aus X/Y,
+    fuer Zeilen ohne gueltige X/Y faellt es auf die alte GPS-Spalte zurueck."""
+    nan = pd.Series(float("nan"), index=df.index)
+    lat, lon, east, north = nan.copy(), nan.copy(), nan.copy(), nan.copy()
+
+    if COORD_X_COL in df.columns and COORD_Y_COL in df.columns:
+        east, north = _coords_from_xy(df)
+
+    if COORD_COL in df.columns:
+        missing = east.isna() | north.isna()
+        l_lat, l_lon, l_east, l_north = _coords_from_legacy(df)
+        lat, lon = l_lat.where(missing), l_lon.where(missing)
+        east = east.where(~missing, l_east)
+        north = north.where(~missing, l_north)
+
+    ok = east.notna() & north.notna()
+    if ok.any():
+        lons, lats = _TRANSFORMER.transform(east[ok].values, north[ok].values)
+        lat[ok] = lats
+        lon[ok] = lons
+
+    df["_lat"] = lat.astype(float)
+    df["_lon"] = lon.astype(float)
     return df
 
 
@@ -354,7 +367,7 @@ def _read_data(filepath, headers, hidden_rows):
 
 
 @st.cache_data(show_spinner="Daten werden geladen ...")
-def read_excel_structure(filepath, file_mtime, coord_system="WGS84"):
+def read_excel_structure(filepath, file_mtime):
     headers, category_by_col, hidden_rows = _read_structure(filepath)
     data_rows = _read_data(filepath, headers, hidden_rows)
 
@@ -400,7 +413,7 @@ def read_excel_structure(filepath, file_mtime, coord_system="WGS84"):
     }
 
     # Batch coordinate conversion
-    df = _add_coordinates(df, coord_system)
+    df = _add_coordinates(df)
 
     return df, cat_map, ordered_categories, col_info
 
@@ -867,35 +880,15 @@ if "filepath" not in st.session_state or st.session_state.filepath is None:
         st.rerun()
     st.stop()
 
-# --- KOORDINATENSYSTEM WAHL ---
-if "filepath" in st.session_state and st.session_state.filepath and "coord_system" not in st.session_state:
-    st.subheader("Koordinatensystem waehlen")
-    st.info(f"Datei: **{os.path.basename(st.session_state.filepath)}**")
-    coord_choice = st.radio(
-        "In welchem Koordinatensystem sind die GPS-Koordinaten gespeichert?",
-        options=["WGS84", "LV95"],
-        captions=[
-            "Breite / Laenge (z.B. 47.3769, 8.5417)",
-            "Swiss LV95 / EPSG:2056 (z.B. 2600000, 1200000)",
-        ],
-        index=0,
-    )
-    if st.button("Weiter", type="primary"):
-        st.session_state.coord_system = coord_choice
-        st.rerun()
-    st.stop()
-
-
 # --- DATEN LADEN ---
 filepath = st.session_state.filepath
-coord_system = st.session_state.get("coord_system", "WGS84")
 
-_LOAD_KEYS = ["filepath", "df", "cat_map", "ordered_categories", "col_info", "filterable_cols", "coord_system"]
+_LOAD_KEYS = ["filepath", "df", "cat_map", "ordered_categories", "col_info", "filterable_cols"]
 
 if "df" not in st.session_state:
     try:
         df, cat_map, ordered_categories, col_info = read_excel_structure(
-            filepath, os.path.getmtime(filepath), coord_system
+            filepath, os.path.getmtime(filepath)
         )
         st.session_state.df = df
         st.session_state.cat_map = cat_map
@@ -1122,19 +1115,8 @@ with tab_edit:
                         for (_, col_name), val in changed_cells.items():
                             st.session_state.df.at[idx, col_name] = val if val else ""
 
-                        if COORD_COL in {c for _, c in changed_cells.keys()}:
-                            new_coord = st.session_state.df.at[idx, COORD_COL]
-                            _cs = st.session_state.get("coord_system", "WGS84")
-                            pair = _parse_coord_pair(new_coord, _cs)
-                            if pair:
-                                if _cs == "LV95":
-                                    lon, lat = _TRANSFORMER.transform(pair[0], pair[1])
-                                else:
-                                    lat, lon = pair[0], pair[1]
-                            else:
-                                lat, lon = None, None
-                            st.session_state.df.at[idx, "_lat"] = lat
-                            st.session_state.df.at[idx, "_lon"] = lon
+                        if any(c in COORD_COLS for _, c in changed_cells.keys()):
+                            _add_coordinates(st.session_state.df)
 
                         st.cache_data.clear()
                         st.success(f"{len(changed_cells)} Feld(er) gespeichert!")
@@ -1164,18 +1146,39 @@ with tab_debug:
 
     st.markdown("---")
     for check_col, label in [
-        (COORD_COL, "Koordinaten-Spalte"),
+        (COORD_X_COL, "Koordinate X (LV95)"),
+        (COORD_Y_COL, "Koordinate Y (LV95)"),
+        (COORD_COL, "GPS-Spalte (Altformat, Fallback)"),
         (ID_COL, "ID-Spalte"),
         (STREET_COL, "Strasse-Spalte"),
     ]:
-        found = check_col in df.columns
-        st.markdown(f"**{label}** `{check_col}`: {'gefunden' if found else 'NICHT gefunden'}")
+        if check_col in col_info:
+            letter = get_column_letter(col_info[check_col]["col_index"])
+            status = f"gefunden in Spalte {letter}"
+        else:
+            status = "NICHT gefunden"
+        st.markdown(f"**{label}** `{check_col}`: {status}")
 
-    if COORD_COL in df.columns:
+    present_coord_cols = [c for c in COORD_COLS if c in df.columns]
+    if present_coord_cols:
         st.markdown("---")
-        st.markdown("**Rohe Koordinaten-Werte (erste 3):**")
-        non_empty = df[COORD_COL][~df[COORD_COL].str.strip().isin(EMPTY_VALS)]
-        st.write(non_empty.head(3).tolist())
-        st.markdown("**Umgerechnete Koordinaten (erste 3):**")
-        st.write(df[["_lat", "_lon"]].dropna().head(3))
+        has_raw = pd.Series(False, index=df.index)
+        for c in present_coord_cols:
+            has_raw |= ~df[c].str.strip().isin(EMPTY_VALS)
+        invalid = df[has_raw & df["_lat"].isna()]
+
+        st.markdown("**Koordinaten roh und umgerechnet (erste 3):**")
+        st.dataframe(
+            df.loc[df["_lat"].notna(), present_coord_cols + ["_lat", "_lon"]].head(3),
+            use_container_width=True,
+        )
+        st.markdown(f"**Zeilen mit Koordinaten-Eintrag, aber nicht interpretierbar:** {len(invalid)}")
+        if len(invalid):
+            id_cols = [c for c in (ID_COL, STREET_COL) if c in df.columns]
+            st.dataframe(
+                invalid[["_excel_row"] + id_cols + present_coord_cols]
+                .rename(columns={"_excel_row": "Excel-Zeile"}),
+                use_container_width=True,
+                hide_index=True,
+            )
 
