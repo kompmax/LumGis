@@ -292,7 +292,7 @@
     const issues = [];
     if (rep.noCoords) issues.push(`${fmtCount(rep.noCoords)} ohne Koordinaten`);
     if (rep.invalidCoords) issues.push(`${fmtCount(rep.invalidCoords)} Koordinaten nicht lesbar`);
-    if (rep.duplicates.length) issues.push(`${fmtCount(rep.duplicates.length)} doppelte Lichtpunkt-Nr.`);
+    if (rep.duplicates.length) issues.push(`${fmtCount(rep.duplicates.length)} doppelte ${esc(rep.dupCol)}`);
     $("summary").innerHTML =
       `<div class="big"><b>${fmtCount(onMap)}</b> von ${fmtCount(rows.length)} Leuchten auf der Karte</div>` +
       (rows.length !== total ? `<div class="muted">Auswahl aus ${fmtCount(total)} Leuchten</div>` : "") +
@@ -300,7 +300,7 @@
         ? `<div class="issues">${issues.join(" · ")} – <a data-goto="report">Prüfbericht</a></div>`
         : `<div class="ok">Alle Leuchten haben gültige Koordinaten.</div>`) +
       (capture.items.size
-        ? `<div class="issues">${fmtCount(capture.items.size)} ${capture.items.size === 1 ? "erfasste Position" : "erfasste Positionen"} noch nicht in Excel übernommen – <a data-mode="capture">Erfassen</a></div>`
+        ? `<div class="issues">${fmtCount(capture.items.size)} ${capture.items.size === 1 ? "geänderte Position" : "geänderte Positionen"} noch nicht in Excel übernommen – <a data-mode="capture">Erfassen</a></div>`
         : "");
   }
 
@@ -371,9 +371,16 @@
     for (const r of state.model.rows) {
       if (r.lat == null) { markers.push(null); continue; }
       // Bestehende Leuchten als Orientierung im Modus «Erfassen» (nicht anklickbar)
-      contextLayer.addLayer(L.circleMarker([r.lat, r.lon], {
-        radius: 5, weight: 1.5, color: "#111827", fillColor: "#ffffff", fillOpacity: 0.9, interactive: false,
-      }));
+      // Im Modus «Erfassen»: anklicken = Leuchte verschieben; waehrend des Setzens zaehlt der Klick als Kartenklick
+      const ctx = L.circleMarker([r.lat, r.lon], {
+        radius: 5, weight: 1.5, color: "#111827", fillColor: "#ffffff", fillOpacity: 0.9, bubblingMouseEvents: false,
+      });
+      ctx.bindTooltip(() => esc(rowTitle(r)) + " · anklicken zum Verschieben", { direction: "top", offset: [0, -6] });
+      ctx.on("click", (e) => {
+        if (plan.busy) { plan.onMapClick(e.latlng); return; }
+        if (capture.placing) placeAt(e.latlng); else startPlacing(itemKey(r));
+      });
+      contextLayer.addLayer(ctx);
       const mk = L.circleMarker([r.lat, r.lon], { radius: 6, weight: 1, color: "#1f2937", fillOpacity: 0.9 });
       mk.row = r;
       mk.bindTooltip(() => esc(rowTitle(r)) + (r.values[C.STREET_COL] ? " | " + esc(r.values[C.STREET_COL]) : ""),
@@ -482,7 +489,7 @@
       ["Leuchten gelesen", rep.rows], ["davon mit Koordinaten", rep.withCoords], ["ohne Koordinaten", rep.noCoords],
       ["Koordinaten nicht lesbar", rep.invalidCoords], ["ausgeblendete Zeilen übersprungen", rep.hiddenRows],
       ["ausgeblendete Spalten ignoriert", rep.hiddenCols], ["Zeilen ohne Lichtpunkt-Nr. verworfen", rep.noId],
-      ["doppelte Lichtpunkt-Nr.", rep.duplicates.length],
+      [`doppelte ${esc(rep.dupCol)}`, rep.duplicates.length],
     ];
     const coordCols = C.COORD_COLS.filter((c) => m.columns.includes(c));
     const invalid = rep.invalidRows.map((n) => byRow.get(n));
@@ -499,8 +506,8 @@
         <table class="data"><thead><tr><th>Excel-Zeile</th><th>Lichtpunkt</th><th>Strasse</th>${coordCols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
         <tbody>${invalid.map((r) => `<tr><td>${r.excelRow}</td><td>${esc(rowTitle(r))}</td><td>${esc(r.values[C.STREET_COL] || "")}</td>${coordCols.map((c) => `<td>${esc(r.values[c])}</td>`).join("")}</tr>`).join("")}</tbody></table>
       </div></details>` : ""}
-      ${rep.duplicates.length ? `<details open><summary>Doppelte Lichtpunkt-Nr. (${fmtCount(rep.duplicates.length)})</summary><div>
-        <table class="data"><thead><tr><th>Lichtpunkt-Nr.</th><th>Excel-Zeilen</th></tr></thead>
+      ${rep.duplicates.length ? `<details open><summary>Doppelte ${esc(rep.dupCol)} (${fmtCount(rep.duplicates.length)})</summary><div>
+        <table class="data"><thead><tr><th>${esc(rep.dupCol)}</th><th>Excel-Zeilen</th></tr></thead>
         <tbody>${rep.duplicates.map(([v, rows]) => `<tr><td>${esc(v)}</td><td>${rows.join(", ")}</td></tr>`).join("")}</tbody></table>
       </div></details>` : ""}
       <h3>Gefundene Spalten</h3><ul>${found}</ul>
@@ -529,6 +536,10 @@
   const captureKey = () => "capture." + state.fileName;
   const itemKey = (r) => "Z" + r.excelRow;
   const itemTitle = (it) => (it.row ? rowTitle(it.row) : it.title);
+  /** LV95-Position einer Zeile laut Excel (auch aus dem WGS84-Altformat) oder null. */
+  const rowLV95 = (r) => (r.lv95 ? r.lv95 : r.lat != null ? C.toLV95(proj4, r.lat, r.lon) : null);
+  const isMove = (it) => !!(it.row && it.row.lat != null);
+  const moveDist = (it) => { const o = rowLV95(it.row); return Math.hypot(it.e - o[0], it.n - o[1]); };
   const candidates = () => state.model.rows.filter((r) => r.lat == null);
 
   function saveCapture() {
@@ -551,7 +562,8 @@
         const hits = rows.filter((r) => sameId(r, ids));
         row = hits.length === 1 ? hits[0] : null;
       }
-      if (row && row.lat != null) { capture.transferred++; continue; }
+      const inExcel = row && rowLV95(row);
+      if (inExcel && Math.hypot(inExcel[0] - it.e, inExcel[1] - it.n) <= 0.05) { capture.transferred++; continue; }
       const item = { ...it, row, orphan: !row };
       if (row) Object.assign(item, { key: itemKey(row), excelRow: row.excelRow, ids: rowIds(row), title: rowTitle(row) });
       else item.key = "O" + (it.excelRow || "") + "|" + (it.title || "");
@@ -620,8 +632,11 @@
     capture.placing = capture.placing === key ? null : key;
     if (capture.placing) {
       const item = capture.items.get(key);
+      const existing = !item && state.model.rows.find((x) => itemKey(x) === key && x.lat != null);
       if (item) {
         map.setView([item.lat, item.lon], Math.max(map.getZoom(), 18), { animate: false });
+      } else if (existing) {
+        map.setView([existing.lat, existing.lon], Math.max(map.getZoom(), 19), { animate: false });
       } else {
         // Ohne Position: zuerst die Beschriftung im ausgerichteten Plan suchen,
         // sonst zur Leuchte mit Koordinaten springen, die in Excel am naechsten liegt
@@ -660,13 +675,19 @@
     const key = capture.placing;
     let item = capture.items.get(key);
     if (!item) {
-      const r = candidates().find((c) => itemKey(c) === key);
+      const r = state.model.rows.find((c) => itemKey(c) === key);
       if (!r) return;
       item = { key, title: rowTitle(r), ids: rowIds(r), excelRow: r.excelRow, street: r.values[C.STREET_COL] || "", row: r };
       capture.items.set(key, item);
     }
     setPosition(item, latlng.lat, latlng.lng);
     saveCapture();
+    if (isMove(item)) {
+      capture.placing = null; // verschobene Leuchte: kein automatisches Weiterspringen
+      renderCaptureMarkers();
+      renderCapture();
+      return;
+    }
     // Automatisch zur naechsten Leuchte ohne Position (in Excel-Reihenfolge)
     const open = candidates().filter((r) => !capture.items.has(itemKey(r)));
     const next = open.find((r) => r.excelRow > item.excelRow) || open[0] || null;
@@ -684,9 +705,11 @@
       const it = capture.items.get(capture.placing);
       const r = it ? it.row : state.model.rows.find((x) => itemKey(x) === capture.placing);
       const title = it ? itemTitle(it) : r ? rowTitle(r) : "";
-      el.innerHTML = `Auf die Karte klicken, um <b>${esc(title)}</b> zu setzen · Esc = abbrechen`;
+      el.innerHTML = r && r.lat != null
+        ? `Neue Position für <b>${esc(title)}</b> auf der Karte anklicken · Esc = abbrechen`
+        : `Auf die Karte klicken, um <b>${esc(title)}</b> zu setzen · Esc = abbrechen`;
     } else {
-      el.textContent = "Links eine Leuchte wählen, dann auf die Karte klicken.";
+      el.textContent = "Links eine Leuchte wählen und auf die Karte klicken – oder eine vorhandene Leuchte (weiss) anklicken, um sie zu verschieben.";
     }
     el.hidden = false;
   }
@@ -703,11 +726,13 @@
     const match = (...texts) => !q || texts.some((t) => String(t || "").toLowerCase().includes(q));
     const all = candidates();
     const open = all.filter((r) => !capture.items.has(itemKey(r)));
-    const placed = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
+    const sorted = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
+    const placed = sorted.filter((it) => !isMove(it));
+    const moved = sorted.filter(isMove);
 
     $("capSummary").innerHTML =
-      `<div class="big"><b>${fmtCount(placed.length)}</b> von ${fmtCount(open.length + placed.length)} Leuchten gesetzt</div>` +
-      `<div class="muted">Erfasst werden nur Leuchten ohne gültige Koordinaten.</div>` +
+      `<div class="big"><b>${fmtCount(placed.length)}</b> von ${fmtCount(open.length + placed.length)} Leuchten ohne Koordinaten gesetzt</div>` +
+      (moved.length ? `<div class="big"><b>${fmtCount(moved.length)}</b> vorhandene ${moved.length === 1 ? "Leuchte" : "Leuchten"} verschoben</div>` : "") +
       (capture.transferred ? `<div class="ok">${fmtCount(capture.transferred)} ${capture.transferred === 1 ? "Position ist" : "Positionen sind"} inzwischen in Excel übernommen.</div>` : "");
 
     const entry = (key, title, sub, cls, btn) =>
@@ -720,13 +745,18 @@
         `${esc(it.street || "")}${it.excelRow ? " · Zeile " + it.excelRow : ""} · X ${fmtCount(it.e)} / Y ${fmtCount(it.n)}` +
         (it.orphan ? " · <b>nicht mehr in der Datei</b>" : ""),
         "done", `<button class="undo" data-undo="${esc(it.key)}" title="Position entfernen">↩</button>`));
+    const movedHtml = moved.filter((it) => match(it.street, itemTitle(it), ...Object.values(it.ids || {}))).map((it) =>
+      entry(it.key, itemTitle(it),
+        `${esc(it.street || "")} · Zeile ${it.excelRow} · verschoben um ${moveDist(it).toFixed(2)} m`,
+        "moved", `<button class="undo" data-undo="${esc(it.key)}" title="Zurück auf die Position aus Excel">↩</button>`));
     const none = "<p class='muted'>Keine Treffer.</p>";
     $("capList").innerHTML =
       (open.length ? `<div class="caphead">Noch nicht gesetzt <span>${fmtCount(open.length)}</span></div>${openHtml.join("") || none}` : "") +
       (placed.length ? `<div class="caphead">Gesetzt <span>${fmtCount(placed.length)}</span></div>${placedHtml.join("") || none}` : "") +
-      (!all.length && !placed.length ? `<p class="ok">Alle Leuchten haben gültige Koordinaten. Nichts zu erfassen.</p>` : "");
-    $("btnCapSave").disabled = !placed.length;
-    $("btnCapClear").hidden = !placed.length;
+      (moved.length ? `<div class="caphead">Verschoben <span>${fmtCount(moved.length)}</span></div>${movedHtml.join("") || none}` : "") +
+      (!all.length && !placed.length ? `<p class="ok">Alle Leuchten haben gültige Koordinaten. Vorhandene Leuchten (weiss) lassen sich auf der Karte anklicken und verschieben.</p>` : "");
+    $("btnCapSave").disabled = !sorted.length;
+    $("btnCapClear").hidden = !sorted.length;
     const sel = $("capList").querySelector(".placing");
     if (sel) sel.scrollIntoView({ block: "nearest" });
     for (const it of capture.items.values()) if (it.marker) it.marker.setIcon(captureIcon(it));
@@ -759,13 +789,14 @@
     const idCols = C.ID_COLS.filter((c) => m.columns.includes(c));
     const hasStreet = m.columns.includes(C.STREET_COL);
     const eastInX = xIsEast();
-    const head = ["Excel-Zeile", ...idCols, ...(hasStreet ? [C.STREET_COL] : []), C.COORD_X_COL, C.COORD_Y_COL];
+    const head = ["Excel-Zeile", ...idCols, ...(hasStreet ? [C.STREET_COL] : []), C.COORD_X_COL, C.COORD_Y_COL, "Änderung"];
     const rows = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0)).map((it) => [
       it.excelRow || "",
       ...idCols.map((c) => (it.row ? it.row.values[c] : (it.ids && it.ids[c]) || (!it.ids && c === C.ID_COL ? it.title : ""))),
       ...(hasStreet ? [it.street || ""] : []),
       eastInX ? it.e : it.n,
       eastInX ? it.n : it.e,
+      isMove(it) ? `verschoben um ${moveDist(it).toFixed(2)} m` : "neu gesetzt",
     ]);
     const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
     ws["!cols"] = head.map((h) => ({ wch: Math.max(12, h.length + 2) }));
@@ -891,7 +922,7 @@
     });
     $("btnCapSave").addEventListener("click", () => saveCoordinateList());
     $("btnCapClear").addEventListener("click", () => {
-      if (!confirm(`Alle ${capture.items.size} gesetzten Positionen verwerfen?`)) return;
+      if (!confirm(`Alle ${capture.items.size} gesetzten und verschobenen Positionen verwerfen?`)) return;
       capture.items.clear();
       capture.placing = null;
       saveCapture();

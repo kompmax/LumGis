@@ -467,9 +467,11 @@ def build_report(df, n_hidden_rows, n_hidden_cols, n_no_id):
         has_raw |= ~df[c].str.strip().isin(EMPTY_VALS)
     has_coord = df["_lat"].notna()
 
+    # Doppelte Nummern: «Lichtpunkt-Nr. neu» (Plannummern), bei aelteren Dateien ohne diese Spalte «Lichtpunkt-Nr.»
+    dup_col = ID_COL_NEU if ID_COL_NEU in df.columns else ID_COL
     duplicates = []
-    if ID_COL in df.columns:
-        ids = df[ID_COL].str.strip()
+    if dup_col in df.columns:
+        ids = df[dup_col].str.strip()
         ids = ids[~ids.isin(EMPTY_VALS)]
         for val, rows in df.loc[ids.index, "_excel_row"].groupby(ids, sort=True):
             if len(rows) > 1:
@@ -485,6 +487,7 @@ def build_report(df, n_hidden_rows, n_hidden_cols, n_no_id):
         "hidden_cols": n_hidden_cols,
         "no_id": n_no_id,
         "duplicates": duplicates,
+        "dup_col": dup_col,
         "checksum": f"{digest[:4]}-{digest[4:8]}",
         "details": details,
     }
@@ -1100,7 +1103,7 @@ with tab_report:
             ("ausgeblendete Zeilen uebersprungen", report["hidden_rows"]),
             ("ausgeblendete Spalten ignoriert", report["hidden_cols"]),
             ("Zeilen ohne Lichtpunkt-Nr. verworfen", report["no_id"]),
-            ("doppelte Lichtpunkt-Nr.", dup_count),
+            (f"doppelte {report['dup_col']}", dup_count),
         ],
         columns=["Kennzahl", "Anzahl"],
     ).set_index("Kennzahl"))
@@ -1117,11 +1120,11 @@ with tab_report:
                 hide_index=True,
             )
     if dup_count:
-        with st.expander(f"Doppelte Lichtpunkt-Nr. ({dup_count})"):
+        with st.expander(f"Doppelte {report['dup_col']} ({dup_count})"):
             st.dataframe(
                 pd.DataFrame(
                     [(v, ", ".join(map(str, rows))) for v, rows in report["duplicates"]],
-                    columns=["Lichtpunkt-Nr.", "Excel-Zeilen"],
+                    columns=[report["dup_col"], "Excel-Zeilen"],
                 ),
                 use_container_width=True,
                 hide_index=True,

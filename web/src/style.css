@@ -233,6 +233,7 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
 .capitem:hover { border-color: var(--orange); }
 .capitem.open { border-left-color: #9ca3af; }
 .capitem.done { border-left-color: var(--ok); }
+.capitem.moved { border-left-color: #2563eb; }
 .capitem.placing { border-color: var(--orange); border-left-color: var(--orange); background: var(--orange-soft); }
 .capitem .t { font-weight: 600; display: block; }
 .capitem small { color: var(--muted); display: block; word-break: break-word; }

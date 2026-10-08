@@ -6,7 +6,7 @@ LumGis zeigt ein Leuchten-Inventar aus Excel auf einer Karte. Es liefert:
 - **Filter und Suche**, um Leuchten nach Typ, Strasse oder Nummer einzugrenzen
 - **Tabelle** mit den gefilterten Leuchten und der Excel-Zeile
 - **Prüfbericht** mit Hinweisen auf fehlende oder fehlerhafte Angaben
-- **Erfassen**: fehlende Koordinaten auf der Karte setzen und als Liste speichern, auf Wunsch mit einem PDF-Plan als Vorlage
+- **Erfassen**: fehlende Koordinaten setzen und falsche verschieben, als Liste speichern, auf Wunsch mit einem PDF-Plan als Vorlage
 
 LumGis verändert die Excel-Datei nie. Änderungen und erfasste Koordinaten überträgt man selbst in Excel.
 
@@ -89,9 +89,9 @@ Filter und Suche bleiben dabei erhalten. Mit **Andere Datei …** wird eine ande
 
 **Wichtig:** Ohne **Neu laden** zeigt LumGis weiterhin den Stand beim Öffnen.
 
-## 5. Fehlende Koordinaten erfassen
+## 5. Koordinaten erfassen und korrigieren
 
-Im Modus **Erfassen** setzt man Leuchten ohne gültige Koordinaten auf der Karte. Bestehende Koordinaten lassen sich hier nicht ändern. Das macht man in Excel.
+Im Modus **Erfassen** setzt man Leuchten ohne gültige Koordinaten auf der Karte und verschiebt vorhandene Leuchten, deren Lage nicht stimmt. Die Excel-Datei ändert LumGis dabei nicht: Alle Änderungen landen in der Koordinatenliste, die man in Excel überträgt.
 
 ### 5.1 Positionen setzen
 
@@ -100,32 +100,40 @@ Im Modus **Erfassen** setzt man Leuchten ohne gültige Koordinaten auf der Karte
 3. Links eine Leuchte anklicken. Die Karte springt zu der Leuchte mit Koordinaten, die in Excel am nächsten liegt.
 4. Oben auf der Karte steht «Auf die Karte klicken, um … zu setzen». An die richtige Stelle klicken. Der Punkt erscheint orange, und die nächste Leuchte ist gleich ausgewählt.
 
-Die Liste links ist geteilt in **Noch nicht gesetzt** und **Gesetzt**. Oben steht der Stand, z. B. «12 von 40 Leuchten gesetzt». Mit dem Feld **Suche** findet man eine Leuchte über die Lichtpunkt-Nr. oder die Strasse.
+Die Liste links ist geteilt in **Noch nicht gesetzt**, **Gesetzt** und **Verschoben**. Oben steht der Stand, z. B. «12 von 40 Leuchten ohne Koordinaten gesetzt». Mit dem Feld **Suche** findet man eine Leuchte über die Lichtpunkt-Nr. oder die Strasse.
 
-### 5.2 Korrigieren
+### 5.2 Vorhandene Leuchten verschieben
 
-- Die vorhandenen Leuchten erscheinen als weisse Punkte zur Orientierung. Sie lassen sich hier nicht verschieben.
-- Einen gesetzten orangen Punkt mit der Maus an die richtige Stelle ziehen.
+Leuchten, die bereits Koordinaten in Excel haben, erscheinen als weisse Punkte.
+
+1. Den weissen Punkt anklicken. Oben steht «Neue Position für … auf der Karte anklicken».
+2. An die richtige Stelle klicken. Der Punkt erscheint orange und steht links unter **Verschoben**, z. B. «verschoben um 2.35 m».
+
+Der weisse Punkt bleibt an der alten Stelle sichtbar, damit man die Verschiebung sieht. Der Pfeil rechts neben einer verschobenen Leuchte setzt sie auf die Position aus Excel zurück.
+
+### 5.3 Korrigieren
+
+- Einen orangen Punkt mit der Maus an die richtige Stelle ziehen.
 - Eine gesetzte Leuchte in der Liste oder auf der Karte anklicken und neu auf die Karte klicken, um sie neu zu setzen.
 - **Esc** bricht das Setzen ab.
-- Mit dem Pfeil rechts neben einer gesetzten Leuchte wird ihre Position entfernt.
-- **Alle gesetzten Positionen verwerfen** löscht alle gesetzten Positionen dieser Datei. Vorher fragt LumGis nach.
+- Mit dem Pfeil rechts neben einer Leuchte wird ihre Änderung entfernt.
+- **Alle Änderungen verwerfen** löscht alle gesetzten und verschobenen Positionen dieser Datei. Vorher fragt LumGis nach.
 
-**Wichtig:** Die gesetzten Positionen werden nur in diesem Browser auf diesem Computer gespeichert, unter dem Namen der Excel-Datei. Sie überstehen das Schliessen des Browsers, aber nicht das Löschen der Browserdaten. Deshalb die Koordinatenliste regelmässig speichern.
+**Wichtig:** Die gesetzten und verschobenen Positionen werden nur in diesem Browser auf diesem Computer gespeichert, unter dem Namen der Excel-Datei. Sie überstehen das Schliessen des Browsers, aber nicht das Löschen der Browserdaten. Deshalb die Koordinatenliste regelmässig speichern.
 
-### 5.3 In Excel übernehmen
+### 5.4 In Excel übernehmen
 
-1. **Koordinatenliste speichern** klicken. Im Download-Ordner liegt eine Excel-Datei, z. B. «Inventar_Koordinaten_20261007.xlsx», mit den Spalten Excel-Zeile, Lichtpunkt-Nr., Strasse, «Koordinate X» und «Koordinate Y».
+1. **Koordinatenliste speichern** klicken. Im Download-Ordner liegt eine Excel-Datei, z. B. «Inventar_Koordinaten_20261007.xlsx», mit den Spalten Excel-Zeile, Lichtpunkt-Nummern, Strasse, «Koordinate X», «Koordinate Y» und «Änderung» («neu gesetzt» oder «verschoben um … m»).
 2. Die Werte in die Inventar-Datei übertragen. Bei wenigen Leuchten anhand der Excel-Zeile von Hand kopieren. Bei vielen Leuchten mit XVERWEIS über die Lichtpunkt-Nr., danach die Formeln mit **Inhalte einfügen → Werte** ersetzen.
 3. Die Inventar-Datei speichern und in LumGis **Neu laden** klicken.
 
-LumGis erkennt die übernommenen Leuchten, nimmt sie aus der Liste und meldet zum Beispiel «3 Positionen sind inzwischen in Excel übernommen». Ob X den Ost- oder den Nordwert enthält, richtet sich nach den vorhandenen Daten in der Datei.
+LumGis erkennt die übernommenen Leuchten, nimmt sie aus der Liste und meldet zum Beispiel «3 Positionen sind inzwischen in Excel übernommen». Als übernommen gilt eine Leuchte, wenn in Excel genau die gesetzte Position steht (auf 5 cm). Steht dort etwas anderes, bleibt sie unter **Verschoben**, mit dem Abstand zur Position in Excel. Ob X den Ost- oder den Nordwert enthält, richtet sich nach den vorhandenen Daten in der Datei.
 
-Solange gesetzte Positionen noch nicht in Excel stehen, erinnert der Modus **Ansehen** daran: «… erfasste Positionen noch nicht in Excel übernommen». Ein Klick auf **Erfassen** im Hinweis wechselt direkt in den Modus.
+Solange Änderungen noch nicht in Excel stehen, erinnert der Modus **Ansehen** daran: «… geänderte Positionen noch nicht in Excel übernommen». Ein Klick auf **Erfassen** im Hinweis wechselt direkt in den Modus.
 
 **Wichtig:** Steht bei einer gesetzten Leuchte «nicht mehr in der Datei», gibt es ihre Lichtpunkt-Nr. in der Excel-Datei nicht mehr, z. B. weil die Zeile gelöscht oder die Nummer geändert wurde. Die Position bleibt in der Liste und wird mitgespeichert. Ob sie noch gebraucht wird, in Excel prüfen.
 
-### 5.4 Mit einem PDF-Plan als Vorlage
+### 5.5 Mit einem PDF-Plan als Vorlage
 
 Ein Beleuchtungsplan als PDF lässt sich über die Karte legen. Die Leuchten setzt man dann direkt auf die Symbole im Plan. Der Plan muss nicht georeferenziert sein; LumGis richtet ihn über zwei Passpunkte aus.
 
@@ -181,7 +189,7 @@ Der **Prüfbericht** zeigt, was beim Lesen aufgefallen ist:
 | **ausgeblendete Zeilen übersprungen** | in Excel ausgeblendete Zeilen mit Inhalt |
 | **ausgeblendete Spalten ignoriert** | in Excel ausgeblendete Spalten mit Überschrift |
 | **Zeilen ohne Lichtpunkt-Nr. verworfen** | Zeilen mit Inhalt, aber ohne jede Nummer |
-| **doppelte Lichtpunkt-Nr.** | dieselbe Nummer in mehreren Zeilen |
+| **doppelte Lichtpunkt-Nr. neu** | dieselbe Nummer in mehreren Zeilen. Fehlt die Spalte «Lichtpunkt-Nr. neu», prüft LumGis «Lichtpunkt-Nr.» |
 
 Nicht lesbare Koordinaten und doppelte Nummern sind mit Excel-Zeile aufgelistet. So lassen sie sich in Excel direkt korrigieren.
 

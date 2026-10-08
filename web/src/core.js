@@ -346,10 +346,12 @@
       if (!hasRaw) noCoords++;
       if (hasRaw && !hasCoord) invalidRows.push(r.excelRow);
     }
+    // Doppelte Nummern: «Lichtpunkt-Nr. neu» (Plannummern), bei aelteren Dateien ohne diese Spalte «Lichtpunkt-Nr.»
+    const dupCol = model.columns.includes(ID_COL_NEU) ? ID_COL_NEU : ID_COL;
     const byId = new Map();
-    if (model.columns.includes(ID_COL)) {
+    if (model.columns.includes(dupCol)) {
       for (const r of model.rows) {
-        const id = String(r.values[ID_COL]).trim();
+        const id = String(r.values[dupCol]).trim();
         if (EMPTY_VALS.has(id)) continue;
         if (!byId.has(id)) byId.set(id, []);
         byId.get(id).push(r.excelRow);
@@ -368,6 +370,7 @@
       hiddenCols: model.stats.hiddenCols,
       noId: model.stats.noId,
       duplicates,
+      dupCol,
       checksum: `${digest.slice(0, 4)}-${digest.slice(4, 8)}`,
       details,
     };

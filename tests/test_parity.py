@@ -76,6 +76,23 @@ def make_edge_file(path):
     wb.save(path)
 
 
+def make_dup_file(path):
+    """Doppelte «Lichtpunkt-Nr. neu» (Plannummern), alte Nummern eindeutig."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Lp"
+    for c, h in enumerate(["Lichtpunkt-Nr.", "Lichtpunkt-Nr. neu", "Strasse", "Koordinate X", "Koordinate Y"], start=2):
+        ws.cell(55, c, h)
+    for i, (old, new) in enumerate([("1001", "C-01"), ("1002", "C-02"), ("1003", "C-01"), ("1004", ""), ("1004", "C-03")]):
+        ws.cell(56 + i, 2, old)
+        if new:
+            ws.cell(56 + i, 3, new)
+        ws.cell(56 + i, 4, "Weg")
+        ws.cell(56 + i, 5, 2683000 + i)
+        ws.cell(56 + i, 6, 1247000 + i)
+    wb.save(path)
+
+
 def make_big_file(path, n=2000):
     random.seed(7)
     wb = openpyxl.Workbook()
@@ -136,6 +153,8 @@ def compare(name, path):
     for pk, jk in KEYS:
         if py[pk] != js[jk]:
             problems.append(f"{pk}: Python={py[pk]} JS={js[jk]}")
+    if py["dup_col"] != js["dupCol"]:
+        problems.append(f"Spalte fuer Duplikate: Python={py['dup_col']} JS={js['dupCol']}")
     dup_py = [[v, rows] for v, rows in py["duplicates"]]
     if dup_py != js["duplicates"]:
         problems.append(f"duplicates: Python={dup_py} JS={js['duplicates']}")
@@ -171,6 +190,9 @@ if __name__ == "__main__":
         p = os.path.join(tmp, "lp_sonderfaelle.xlsx")
         make_edge_file(p)
         results.append(compare("Sonderfaelle", p))
+        p = os.path.join(tmp, "lp_duplikate.xlsx")
+        make_dup_file(p)
+        results.append(compare("Duplikate in Lichtpunkt-Nr. neu", p))
         p = os.path.join(tmp, "lp_gross.xlsx")
         make_big_file(p)
         results.append(compare("2000 Leuchten", p))
