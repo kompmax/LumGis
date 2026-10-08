@@ -23,6 +23,8 @@
       opts: { maxZoom: 21, maxNativeZoom: 19, attribution: "© swisstopo swissTLM3D" } },
     lk: { label: "Landeskarte", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg",
       opts: { maxZoom: 21, maxNativeZoom: 19, attribution: "© swisstopo" } },
+    av: { label: "Vermessung", url: "https://wmts.geo.admin.ch/1.0.0/ch.kantone.cadastralwebmap-farbe/default/current/3857/{z}/{x}/{y}.png",
+      opts: { maxZoom: 21, maxNativeZoom: 20, attribution: "© Kantone, amtliche Vermessung" } },
     img: { label: "Luftbild", url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg",
       opts: { maxZoom: 21, maxNativeZoom: 20, attribution: "© swisstopo SWISSIMAGE" } },
   };
@@ -44,20 +46,20 @@
         req.onerror = () => reject(req.error);
       });
     },
-    async get() {
+    async get(key = "last") {
       try {
         const db = await this.open();
         return await new Promise((res) => {
-          const r = db.transaction("handles").objectStore("handles").get("last");
+          const r = db.transaction("handles").objectStore("handles").get(key);
           r.onsuccess = () => res(r.result || null);
           r.onerror = () => res(null);
         });
       } catch (e) { return null; }
     },
-    async set(handle) {
+    async set(handle, key = "last") {
       try {
         const db = await this.open();
-        db.transaction("handles", "readwrite").objectStore("handles").put(handle, "last");
+        db.transaction("handles", "readwrite").objectStore("handles").put(handle, key);
       } catch (e) { /* egal */ }
     },
   };
@@ -72,6 +74,12 @@
   let contextLayer = null, captureLayer = null;
   // Modus «Erfassen»: neu gesetzte Positionen fuer Leuchten ohne gueltige Koordinaten
   const capture = { items: new Map(), placing: null, transferred: 0 };
+  // Plan-Overlay (web/src/plan.js)
+  const plan = window.LumGisPlan.create({
+    getMap: () => map, C, store, esc, $, handleDb,
+    getContextKey: () => state.fileName,
+    onAligned: () => { if (state.mode === "capture") renderCapture(); },
+  });
   const markers = []; // parallel zu state.model.rows (null ohne Koordinaten)
 
   // ---------- Datei oeffnen ----------
@@ -185,6 +193,8 @@
     apply({ fit: true });
     if (firstLoad) switchTab("map");
     setMode(state.mode);
+    plan.offerRecent();
+    plan.refresh();
   }
 
   function buildColorSelect() {
@@ -308,7 +318,10 @@
     markerLayer = L.layerGroup().addTo(map);
     contextLayer = L.layerGroup();
     captureLayer = L.layerGroup();
-    map.on("click", (e) => { if (state.mode === "capture" && capture.placing) placeAt(e.latlng); });
+    map.on("click", (e) => {
+      if (plan.busy) { plan.onMapClick(e.latlng); return; }
+      if (state.mode === "capture" && capture.placing) placeAt(e.latlng);
+    });
     const wanted = store.get("basemap", "strasse");
     $("basemaps").innerHTML = Object.entries(BASEMAPS)
       .map(([k, b]) => `<button data-basemap="${k}">${b.label}</button>`).join("");
@@ -379,7 +392,10 @@
     });
     if (fit && shown.length) {
       const bounds = L.latLngBounds(shown.map((mk) => mk.getLatLng()));
-      map.fitBounds(bounds.pad(0.05), { maxZoom: 18, animate: false });
+      const doFit = () => map.fitBounds(bounds.pad(0.05), { maxZoom: 18, animate: false });
+      // Hat die Karte noch keine Groesse (Fenster verdeckt), erst einpassen, sobald sie eine hat
+      map.invalidateSize();
+      if (map.getSize().x > 0) doFit(); else map.once("resize", doFit);
     }
     setTimeout(() => map.invalidateSize(), 0);
   }
@@ -525,6 +541,7 @@
   }
 
   function setMode(mode) {
+    if (mode !== "capture") plan.cancel();
     state.mode = mode;
     const cap = mode === "capture";
     for (const b of $("modes").querySelectorAll("button")) b.classList.toggle("active", b.dataset.mode === mode);
@@ -585,13 +602,28 @@
       if (item) {
         map.setView([item.lat, item.lon], Math.max(map.getZoom(), 18), { animate: false });
       } else {
-        // Ohne Position: zur Leuchte mit Koordinaten springen, die in Excel am naechsten liegt
+        // Ohne Position: zuerst die Beschriftung im ausgerichteten Plan suchen,
+        // sonst zur Leuchte mit Koordinaten springen, die in Excel am naechsten liegt
         const r = candidates().find((c) => itemKey(c) === key);
-        const near = r && nearestByRow(r.excelRow);
-        if (near) map.setView([near.lat, near.lon], Math.max(map.getZoom(), 18), { animate: false });
+        const inPlan = r && plan.labelLatLng([rowTitle(r), ...C.ID_COLS.map((c) => r.values[c])]);
+        const near = !inPlan && r && nearestByRow(r.excelRow);
+        if (inPlan) {
+          map.setView(inPlan, Math.max(map.getZoom(), 20), { animate: false });
+          pulseAt(inPlan);
+        } else if (near) {
+          map.setView([near.lat, near.lon], Math.max(map.getZoom(), 18), { animate: false });
+        }
       }
     }
     renderCapture();
+  }
+
+  function pulseAt(latlng) {
+    if (pulseMarker) pulseMarker.remove();
+    pulseMarker = L.marker(latlng, {
+      icon: L.divIcon({ className: "", html: '<div class="pulse"></div>', iconSize: [40, 40] }), interactive: false,
+    }).addTo(map);
+    setTimeout(() => { if (pulseMarker) { pulseMarker.remove(); pulseMarker = null; } }, 3800);
   }
 
   function nearestByRow(excelRow) {
@@ -833,7 +865,9 @@
       renderCapture();
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && state.mode === "capture" && capture.placing) { capture.placing = null; renderCapture(); }
+      if (e.key !== "Escape") return;
+      if (plan.cancel()) return;
+      if (state.mode === "capture" && capture.placing) { capture.placing = null; renderCapture(); }
     });
   }
 
@@ -847,7 +881,7 @@
   }
 
   // Fuer Fehlersuche in der Browser-Konsole
-  window.LumGisDebug = { state, get map() { return map; } };
+  window.LumGisDebug = { state, plan, get map() { return map; } };
 
   bind();
   showRecent();

@@ -378,8 +378,14 @@
     return proj4(EPSG_2056, "EPSG:4326").inverse([lon, lat]);
   }
 
+  /** LV95 [E, N] -> WGS84 [lat, lon], fuer das Plan-Overlay. */
+  function toWGS84(proj4, e, n) {
+    const [lon, lat] = proj4(EPSG_2056, "EPSG:4326").forward([e, n]);
+    return [lat, lon];
+  }
+
   return {
-    toLV95, LV95_E_RANGE, LV95_N_RANGE,
+    toLV95, toWGS84, LV95_E_RANGE, LV95_N_RANGE,
     SHEET_NAME, HEADER_ROW, ID_COL, ID_COL_NEU, ID_COL_PROJEKT, ID_COLS,
     COORD_X_COL, COORD_Y_COL, COORD_COL, COORD_COLS, STREET_COL, EMPTY_VALS,
     LumGisError, parseWorkbook, buildReport, fmtNum, pyFloatRepr, excelDateToText, toNumber,

@@ -241,7 +241,7 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
 }
 .capitem .undo:hover { color: var(--err-fg); }
 .capbanner {
-  position: absolute; top: 10px; left: 56px; right: 290px; z-index: 1000; background: #111; color: #fff;
+  position: absolute; top: 10px; left: 56px; right: 400px; z-index: 1000; background: #111; color: #fff;
   border-radius: 8px; padding: 7px 12px; font-size: 13px; box-shadow: var(--shadow); text-align: center;
 }
 .capbanner b { color: #fdba74; }
@@ -252,3 +252,38 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
 }
 .capdot.sel { box-shadow: 0 0 0 3px #111, 0 2px 6px rgba(0, 0, 0, .4); }
 @media (max-width: 760px) { .capbanner { right: 10px; top: 52px; } }
+
+/* Plan-Overlay */
+.plancanvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none; image-rendering: auto; }
+.plansec { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.plansec h3 { font-size: 12px; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.plansec .msg { padding: 8px 10px; margin-top: 8px; font-size: 13px; }
+.plansec .msg.ok { background: #ecfdf5; color: #065f46; }
+.plansec select, .plansec input[type=number] { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); margin-top: 6px; }
+.planbtns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.planbtns button:not(.linkbtn) {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 6px; padding: 5px 10px; cursor: pointer;
+}
+.planbtns button:not(.linkbtn):hover { border-color: var(--orange); }
+.warn-t { color: var(--warn-fg); font-weight: 600; }
+.planbanner { top: 50px; background: #1e3a8a; }
+.planctl {
+  position: absolute; bottom: 24px; left: 10px; z-index: 1000; background: #fff; color: #111; border-radius: 8px;
+  box-shadow: var(--shadow); padding: 6px 10px; display: flex; align-items: center; gap: 10px; font-size: 13px;
+}
+.planctl label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.planctl input[type=range] { width: 110px; accent-color: var(--orange); }
+#map.picking, #map.picking .leaflet-interactive { cursor: crosshair; }
+.pick {
+  width: 22px; height: 22px; border-radius: 50%; color: #fff; font: 700 12px/22px "Segoe UI", sans-serif;
+  text-align: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+}
+.pick.pplan { background: #1e3a8a; }
+.pick.pmap { background: var(--orange); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .plansec .msg.ok { background: #064e3b; color: #a7f3d0; } }
+/* Waehrend des Ausrichtens nur den Hinweis zum Ausrichten zeigen */
+.panel:has(#map.picking) #capBanner { display: none; }
+.planbanner { top: 10px; }
+@media (max-width: 1100px) {
+  .capbanner { right: 10px; top: 52px; }
+}

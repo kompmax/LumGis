@@ -6,7 +6,7 @@ LumGis zeigt ein Leuchten-Inventar aus Excel auf einer Karte. Es liefert:
 - **Filter und Suche**, um Leuchten nach Typ, Strasse oder Nummer einzugrenzen
 - **Tabelle** mit den gefilterten Leuchten und der Excel-Zeile
 - **Prüfbericht** mit Hinweisen auf fehlende oder fehlerhafte Angaben
-- **Erfassen**: fehlende Koordinaten auf der Karte setzen und als Liste speichern
+- **Erfassen**: fehlende Koordinaten auf der Karte setzen und als Liste speichern, auf Wunsch mit einem PDF-Plan als Vorlage
 
 LumGis verändert die Excel-Datei nie. Änderungen und erfasste Koordinaten überträgt man selbst in Excel.
 
@@ -45,7 +45,7 @@ Die Übersicht links oben zeigt zum Beispiel «1'600 von 2'000 Leuchten auf der 
 ### 4.1 Karte
 
 - Mit dem Mausrad zoomen, mit gedrückter Maustaste verschieben.
-- Oben rechts zwischen **Strassenkarte**, **Landeskarte** und **Luftbild** wechseln. Die Auswahl bleibt gespeichert.
+- Oben rechts zwischen **Strassenkarte**, **Landeskarte**, **Vermessung** und **Luftbild** wechseln. Die Auswahl bleibt gespeichert. **Vermessung** zeigt Gebäude und Parzellen der amtlichen Vermessung.
 - Mit der Maus auf eine Leuchte zeigen: Nummer und Strasse erscheinen.
 - Auf eine Leuchte klicken: Alle Angaben erscheinen, mit der **Excel-Zeile**.
 
@@ -121,6 +121,41 @@ Solange gesetzte Positionen noch nicht in Excel stehen, erinnert der Modus **Ans
 
 **Wichtig:** Steht bei einer gesetzten Leuchte «nicht mehr in der Datei», gibt es ihre Lichtpunkt-Nr. in der Excel-Datei nicht mehr, z. B. weil die Zeile gelöscht oder die Nummer geändert wurde. Die Position bleibt in der Liste und wird mitgespeichert. Ob sie noch gebraucht wird, in Excel prüfen.
 
+### 5.4 Mit einem PDF-Plan als Vorlage
+
+Ein Beleuchtungsplan als PDF lässt sich über die Karte legen. Die Leuchten setzt man dann direkt auf die Symbole im Plan. Der Plan muss nicht georeferenziert sein; LumGis richtet ihn über zwei Passpunkte aus.
+
+**Plan laden**
+
+1. Im Modus **Erfassen** im Bereich **Plan (PDF)** auf **Plan laden …** klicken und das PDF wählen. Bei mehreren Seiten die Seite wählen.
+2. Der Plan erscheint in der Mitte der Karte, nach Norden ausgerichtet, im Massstab aus dem Plankopf (z. B. 1:500). Steht kein Massstab im Plan, unter **Massstab des Plans 1:** eintragen.
+
+**Ausrichten mit zwei Passpunkten**
+
+Oben auf der Karte führt eine blaue Anzeige durch die vier Klicks:
+
+1. «Punkt A im Plan anklicken»: einen gut erkennbaren Punkt im Plan anklicken, am besten eine Gebäudeecke.
+2. «Denselben Punkt A auf der Karte anklicken»: denselben Punkt auf der Hintergrundkarte anklicken. Dafür vorher auf **Vermessung** wechseln. Der Plan wird dabei automatisch blass.
+3. «Punkt B im Plan anklicken»: einen zweiten Punkt wählen, möglichst weit weg von A, z. B. am anderen Ende des Plans.
+4. «Denselben Punkt B auf der Karte anklicken».
+
+LumGis berechnet daraus Lage, Massstab und Drehung und meldet zum Beispiel «Ausgerichtet: Massstab 1:501 (laut Plan 1:500), Drehung 2.3°». Weicht der Massstab deutlich vom Plankopf ab, ist ein Passpunkt falsch. Dann **Neu ausrichten**. **Esc** bricht das Ausrichten ab.
+
+**Wichtig:** Passpunkte auf der Karte **Vermessung** setzen, nicht auf dem **Luftbild**. Auf dem Luftbild verdecken Dachvorsprünge und Schatten die echten Gebäudeecken; man liegt schnell einen Meter daneben.
+
+**Genauigkeit prüfen**
+
+**Kontrollpunkt** klicken, einen dritten Punkt im Plan und denselben Punkt auf der Karte anklicken. LumGis meldet die Abweichung, z. B. «Abweichung 0.35 m». Bis etwa 0.5 m ist das gut. Über 2 m passt der Plan schlecht: neu ausrichten, mit Punkten weiter auseinander.
+
+**Arbeiten mit dem Plan**
+
+- Unten links: **Plan** ein- oder ausblenden, mit dem Regler die Transparenz einstellen, mit **weiss** einen weissen Planhintergrund einschalten.
+- Wählt man links eine Leuchte, deren Nummer im Plan beschriftet ist (z. B. «C-03.1»), springt die Karte zu dieser Beschriftung. Dann auf das Leuchtensymbol im Plan klicken.
+- Die Ausrichtung bleibt gespeichert. Lädt man denselben Plan wieder, liegt er sofort richtig. Beim nächsten Öffnen der Excel-Datei bietet LumGis **Plan «…» wieder laden** an.
+- **Plan entfernen** nimmt den Plan von der Karte.
+
+Der Plan bleibt auch im Modus **Ansehen** sichtbar, z. B. um vorhandene Leuchten mit dem Plan zu vergleichen.
+
 ## 6. Koordinaten – was man wissen muss
 
 - Erwartet wird **LV95**, z. B. X = 2'683'000 und Y = 1'247'000.
@@ -171,11 +206,17 @@ Die Leuchte wurde gefunden, hat aber keine gültigen Koordinaten. In Excel X und
 **Ich sehe meine erfassten Positionen auf einem anderen Computer nicht.**
 Die Positionen sind nur im Browser gespeichert, in dem sie gesetzt wurden. Für die Weitergabe die **Koordinatenliste speichern**.
 
+**Der Plan liegt nach dem Ausrichten schief oder verzerrt.**
+Meist ist ein Passpunkt danebengeklickt oder liegen A und B zu nahe beieinander. **Neu ausrichten** mit zwei weit entfernten, eindeutigen Punkten. Bei eingescannten Plänen kann der Plan selbst verzerrt sein; dann mit **Kontrollpunkt** prüfen, ob die Genauigkeit reicht.
+
+**Kann ich einen DWG-Plan laden?**
+Nein. Den Plan in AutoCAD als PDF ausgeben und dieses laden.
+
 **Kann ich Daten exportieren?**
 Nein, bewusst nicht. Ausnahme ist die Koordinatenliste im Modus **Erfassen**. Listen filtert man in Excel mit dem AutoFilter. Dort bleiben Formatierung und Formeln erhalten.
 
 ## 9. Hinweise
 
-Die Hintergrundkarten stammen vom Bundesamt für Landestopografie swisstopo. Die Lage der Leuchten ist so genau wie die Koordinaten in der Excel-Datei.
+Die Hintergrundkarten stammen vom Bundesamt für Landestopografie swisstopo, die Karte **Vermessung** von den Kantonen (amtliche Vermessung). Die Lage der Leuchten ist so genau wie die Koordinaten in der Excel-Datei.
 
 Das Tool unterstützt die Fachplanung. Es ersetzt weder die Normen und Richtlinien noch die Beurteilung durch die zuständigen Stellen.

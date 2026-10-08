@@ -11,7 +11,7 @@ import base64
 import os
 import re
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "LumGis.html")
@@ -39,7 +39,11 @@ def main():
         "JS_XLSX": js("vendor", "xlsx.mini.min.js"),
         "JS_PROJ4": js("vendor", "proj4.js"),
         "JS_LEAFLET": js("vendor", "leaflet.js"),
+        # pdf.js: Worker-Skript als normales Skript -> pdf.js laeuft ohne Web Worker (geht auch unter file://)
+        "JS_PDF": js("vendor", "pdf.min.js"),
+        "JS_PDF_WORKER": js("vendor", "pdf.worker.min.js"),
         "JS_CORE": js("src", "core.js"),
+        "JS_PLAN": js("src", "plan.js"),
         "JS_APP": js("src", "app.js"),
     }
     # Ein Durchgang ueber die Vorlage: eingefuegter Code wird nicht erneut durchsucht

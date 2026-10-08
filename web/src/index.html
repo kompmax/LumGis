@@ -74,11 +74,30 @@
       <button class="btn-primary" id="btnCapSave" type="button">Koordinatenliste speichern</button>
       <button class="linkbtn" id="btnCapClear" type="button">Alle gesetzten Positionen verwerfen</button>
     </div>
+    <div class="plansec">
+      <h3>Plan (PDF)</h3>
+      <div id="planInfo" class="muted small"></div>
+      <div id="planMsg"></div>
+      <select id="planPage" hidden></select>
+      <div class="field" id="planScaleRow" hidden>
+        <label for="planScale">Massstab des Plans 1:</label>
+        <input type="number" id="planScale" value="500" min="10" step="10">
+      </div>
+      <div class="planbtns">
+        <button type="button" id="btnPlanLoad">Plan laden …</button>
+        <button type="button" id="btnPlanRecent" hidden></button>
+        <button type="button" id="btnPlanAlign" hidden>Ausrichten</button>
+        <button type="button" id="btnPlanCheck" hidden>Kontrollpunkt</button>
+        <button type="button" id="btnPlanRemove" class="linkbtn" hidden>Plan entfernen</button>
+      </div>
+      <input type="file" id="planInput" accept=".pdf" hidden>
+    </div>
     <div class="field">
       <label for="capSearch">Suche</label>
       <input type="search" id="capSearch" placeholder="Lichtpunkt-Nr. oder Strasse" autocomplete="off">
     </div>
     <div id="capList"></div>
+
    </div>
   </aside>
 
@@ -93,6 +112,12 @@
       <div id="map"></div>
       <div class="basemaps" id="basemaps"></div>
       <div class="capbanner" id="capBanner" hidden></div>
+      <div class="capbanner planbanner" id="planBanner" hidden></div>
+      <div class="planctl" id="planCtl" hidden>
+        <label title="Plan ein- oder ausblenden"><input type="checkbox" id="planShow" checked> Plan</label>
+        <input type="range" id="planOpacity" min="10" max="100" value="70" title="Transparenz des Plans">
+        <label title="Plan mit weissem Hintergrund"><input type="checkbox" id="planWhite"> weiss</label>
+      </div>
       <div class="tilewarn" id="tilewarn" hidden>
         Hintergrundkarte nicht erreichbar (keine Internetverbindung?). Die Leuchten werden trotzdem angezeigt.
       </div>
@@ -111,7 +136,10 @@
 <script>{{JS_XLSX}}</script>
 <script>{{JS_PROJ4}}</script>
 <script>{{JS_LEAFLET}}</script>
+<script>{{JS_PDF}}</script>
+<script>{{JS_PDF_WORKER}}</script>
 <script>{{JS_CORE}}</script>
+<script>{{JS_PLAN}}</script>
 <script>const LUMGIS_VERSION = "{{VERSION}}";</script>
 <script>{{JS_APP}}</script>
 </body>
