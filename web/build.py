@@ -11,7 +11,7 @@ import base64
 import os
 import re
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "LumGis.html")

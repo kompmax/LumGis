@@ -68,7 +68,7 @@
   const state = {
     model: null, report: null, handle: null, fileName: "",
     filters: new Map(), search: "", colorCol: null,
-    filterable: [], visible: [], tab: "map", mode: "view",
+    filterable: [], visible: [], tab: "map", mode: "view", titleCol: null,
   };
   let map = null, markerLayer = null, legendCtl = null, baseLayer = null, pulseMarker = null;
   let contextLayer = null, captureLayer = null;
@@ -184,6 +184,7 @@
     // Filter behalten, wenn es Spalte und Werte noch gibt (z. B. nach «Neu laden»)
     for (const col of [...state.filters.keys()]) if (!state.filterable.includes(col)) state.filters.delete(col);
 
+    buildTitleSelect();
     buildColorSelect();
     buildFilters();
     initMap();
@@ -265,9 +266,23 @@
     if (state.tab === "table") renderTable();
   }
 
+  // Bezeichnung einer Leuchte: gewaehlte Nummern-Spalte; ist sie leer, die naechste vorhandene Nummer
+  const TITLE_ORDER = [C.ID_COL_NEU, C.ID_COL_PROJEKT, C.ID_COL];
   function rowTitle(r) {
-    for (const c of C.ID_COLS) if (!isEmpty(r.values[c])) return r.values[c];
+    const order = [state.titleCol, ...TITLE_ORDER.filter((c) => c !== state.titleCol)];
+    for (const c of order) if (c && !isEmpty(r.values[c])) return r.values[c];
     return "–";
+  }
+  const rowIds = (r) => Object.fromEntries(C.ID_COLS.filter((c) => !isEmpty(r.values[c])).map((c) => [c, String(r.values[c]).trim()]));
+
+  function buildTitleSelect() {
+    const m = state.model;
+    const present = TITLE_ORDER.filter((c) => m.columns.includes(c));
+    const filled = present.filter((c) => m.rows.some((r) => !isEmpty(r.values[c])));
+    const saved = store.get("titleCol." + state.fileName, null);
+    state.titleCol = present.includes(saved) ? saved : filled[0] || present[0] || null;
+    const html = present.map((c) => `<option ${c === state.titleCol ? "selected" : ""}>${esc(c)}</option>`).join("");
+    for (const sel of document.querySelectorAll(".titleSel")) sel.innerHTML = html;
   }
 
   function renderSummary(rows) {
@@ -512,7 +527,8 @@
 
   // ---------- Modus «Erfassen» ----------
   const captureKey = () => "capture." + state.fileName;
-  const itemKey = (r) => rowTitle(r) + "|" + r.excelRow;
+  const itemKey = (r) => "Z" + r.excelRow;
+  const itemTitle = (it) => (it.row ? rowTitle(it.row) : it.title);
   const candidates = () => state.model.rows.filter((r) => r.lat == null);
 
   function saveCapture() {
@@ -524,16 +540,21 @@
     capture.items.clear();
     capture.placing = null;
     capture.transferred = 0;
-    const byTitle = new Map();
-    for (const r of state.model.rows) {
-      const t = rowTitle(r);
-      byTitle.set(t, byTitle.has(t) ? null : r); // null = Nummer mehrfach vorhanden
-    }
+    // Zeile wiederfinden: gleiche Excel-Zeile mit einer gleichen Nummer, sonst eindeutige Nummer anderswo
+    // (Zeilen eingefuegt/geloescht). Aeltere Eintraege kennen nur «title».
+    const rows = state.model.rows;
+    const sameId = (r, ids) => C.ID_COLS.some((c) => !isEmpty(r.values[c]) && ids.includes(String(r.values[c]).trim()));
     for (const it of store.get(captureKey(), []) || []) {
-      const row = state.model.rows.find((r) => itemKey(r) === it.key) || byTitle.get(it.title) || null;
+      const ids = it.ids ? Object.values(it.ids) : [String(it.title || "").trim()];
+      let row = rows.find((r) => r.excelRow === it.excelRow && sameId(r, ids)) || null;
+      if (!row) {
+        const hits = rows.filter((r) => sameId(r, ids));
+        row = hits.length === 1 ? hits[0] : null;
+      }
       if (row && row.lat != null) { capture.transferred++; continue; }
       const item = { ...it, row, orphan: !row };
-      if (row) { item.key = itemKey(row); item.excelRow = row.excelRow; }
+      if (row) Object.assign(item, { key: itemKey(row), excelRow: row.excelRow, ids: rowIds(row), title: rowTitle(row) });
+      else item.key = "O" + (it.excelRow || "") + "|" + (it.title || "");
       capture.items.set(item.key, item);
     }
     saveCapture();
@@ -577,7 +598,7 @@
     captureLayer.clearLayers();
     for (const item of capture.items.values()) {
       const mk = L.marker([item.lat, item.lon], { icon: captureIcon(item), draggable: true, keyboard: false });
-      mk.bindTooltip(esc(item.title), { direction: "top", offset: [0, -8] });
+      mk.bindTooltip(() => esc(itemTitle(item)), { direction: "top", offset: [0, -8] });
       mk.on("dragend", (e) => {
         const p = e.target.getLatLng();
         setPosition(item, p.lat, p.lng);
@@ -641,7 +662,7 @@
     if (!item) {
       const r = candidates().find((c) => itemKey(c) === key);
       if (!r) return;
-      item = { key, title: rowTitle(r), excelRow: r.excelRow, street: r.values[C.STREET_COL] || "", row: r };
+      item = { key, title: rowTitle(r), ids: rowIds(r), excelRow: r.excelRow, street: r.values[C.STREET_COL] || "", row: r };
       capture.items.set(key, item);
     }
     setPosition(item, latlng.lat, latlng.lng);
@@ -660,7 +681,9 @@
     $("map").classList.toggle("placing", state.mode === "capture" && !!capture.placing);
     if (state.mode !== "capture") { el.hidden = true; return; }
     if (capture.placing) {
-      const title = capture.placing.split("|")[0];
+      const it = capture.items.get(capture.placing);
+      const r = it ? it.row : state.model.rows.find((x) => itemKey(x) === capture.placing);
+      const title = it ? itemTitle(it) : r ? rowTitle(r) : "";
       el.innerHTML = `Auf die Karte klicken, um <b>${esc(title)}</b> zu setzen · Esc = abbrechen`;
     } else {
       el.textContent = "Links eine Leuchte wählen, dann auf die Karte klicken.";
@@ -677,7 +700,7 @@
   function renderCapture() {
     if (!state.model) return;
     const q = $("capSearch").value.trim().toLowerCase();
-    const match = (title, street) => !q || title.toLowerCase().includes(q) || String(street).toLowerCase().includes(q);
+    const match = (...texts) => !q || texts.some((t) => String(t || "").toLowerCase().includes(q));
     const all = candidates();
     const open = all.filter((r) => !capture.items.has(itemKey(r)));
     const placed = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0));
@@ -690,10 +713,10 @@
     const entry = (key, title, sub, cls, btn) =>
       `<div class="capitem ${cls}${capture.placing === key ? " placing" : ""}" data-key="${esc(key)}">` +
       `<span class="t">${esc(title)}</span><small>${sub}</small>${btn}</div>`;
-    const openHtml = open.filter((r) => match(rowTitle(r), r.values[C.STREET_COL] || "")).map((r) =>
+    const openHtml = open.filter((r) => match(r.values[C.STREET_COL], ...Object.values(rowIds(r)))).map((r) =>
       entry(itemKey(r), rowTitle(r), `${esc(r.values[C.STREET_COL] || "")} · Zeile ${r.excelRow} · ${esc(capReason(r))}`, "open", ""));
-    const placedHtml = placed.filter((it) => match(it.title, it.street || "")).map((it) =>
-      entry(it.key, it.title,
+    const placedHtml = placed.filter((it) => match(it.street, itemTitle(it), ...Object.values(it.ids || {}))).map((it) =>
+      entry(it.key, itemTitle(it),
         `${esc(it.street || "")}${it.excelRow ? " · Zeile " + it.excelRow : ""} · X ${fmtCount(it.e)} / Y ${fmtCount(it.n)}` +
         (it.orphan ? " · <b>nicht mehr in der Datei</b>" : ""),
         "done", `<button class="undo" data-undo="${esc(it.key)}" title="Position entfernen">↩</button>`));
@@ -739,7 +762,7 @@
     const head = ["Excel-Zeile", ...idCols, ...(hasStreet ? [C.STREET_COL] : []), C.COORD_X_COL, C.COORD_Y_COL];
     const rows = [...capture.items.values()].sort((a, b) => (a.excelRow || 0) - (b.excelRow || 0)).map((it) => [
       it.excelRow || "",
-      ...idCols.map((c) => (it.row ? it.row.values[c] : c === C.ID_COL ? it.title : "")),
+      ...idCols.map((c) => (it.row ? it.row.values[c] : (it.ids && it.ids[c]) || (!it.ids && c === C.ID_COL ? it.title : ""))),
       ...(hasStreet ? [it.street || ""] : []),
       eastInX ? it.e : it.n,
       eastInX ? it.n : it.e,
@@ -794,6 +817,17 @@
 
     $("btnOpen").addEventListener("click", () => pickFile());
     $("btnReload").addEventListener("click", () => reload());
+    for (const sel of document.querySelectorAll(".titleSel")) {
+      sel.addEventListener("change", (e) => {
+        state.titleCol = e.target.value;
+        store.set("titleCol." + state.fileName, state.titleCol);
+        for (const s of document.querySelectorAll(".titleSel")) s.value = state.titleCol;
+        for (const it of capture.items.values()) if (it.row) it.title = rowTitle(it.row);
+        saveCapture();
+        renderReport();
+        if (state.mode === "capture") renderCapture(); else apply();
+      });
+    }
     $("colorCol").addEventListener("change", (e) => {
       state.colorCol = e.target.value || null;
       store.set("colorCol", state.colorCol);

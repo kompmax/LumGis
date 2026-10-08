@@ -19,7 +19,7 @@ Kurzanleitung: [docs/Anleitung.pdf](docs/Anleitung.pdf).
 ```bash
 python web/build.py           # LumGis.html aus web/src bauen
 python tests/test_parity.py   # Python und HTML lesen identisch (braucht Node.js)
-python docs/anleitung_pdf.py docs/Anleitung.md --logo web/assets/luminum_logo.png --fusszeile "LumGis 1.2.0 – Kurzanleitung · Luminum GmbH"
+python docs/anleitung_pdf.py docs/Anleitung.md --logo web/assets/luminum_logo.png --fusszeile "LumGis 1.2.1 – Kurzanleitung · Luminum GmbH"
 ```
 
 Details zur Architektur: [CLAUDE.md](CLAUDE.md).

@@ -49,13 +49,17 @@ Die Übersicht links oben zeigt zum Beispiel «1'600 von 2'000 Leuchten auf der 
 - Mit der Maus auf eine Leuchte zeigen: Nummer und Strasse erscheinen.
 - Auf eine Leuchte klicken: Alle Angaben erscheinen, mit der **Excel-Zeile**.
 
-### 4.2 Farben
+### 4.2 Bezeichnung
+
+Unter **Bezeichnung nach** wählt man, welche Nummer auf der Karte, in Listen und in der Tabelle als Name der Leuchte erscheint: «Lichtpunkt-Nr. neu», «Lichtpunkt-Nr. Projekt» oder «Lichtpunkt-Nr.». Standard ist «Lichtpunkt-Nr. neu». Ist die gewählte Nummer bei einer Leuchte leer, zeigt LumGis die nächste vorhandene Nummer. Die Wahl bleibt pro Excel-Datei gespeichert und gilt auch im Modus **Erfassen**.
+
+### 4.3 Farben
 
 1. Unter **Farbe nach** die Spalte wählen, z. B. den Leuchtentyp.
 2. Die Legende unten rechts zeigt jede Farbe mit der Anzahl Leuchten.
 3. Auf einen Farbkreis in der Legende klicken, um die Farbe zu ändern. Die Farbe bleibt auf diesem Computer gespeichert.
 
-### 4.3 Filtern
+### 4.4 Filtern
 
 1. Unter **Filter** eine Kategorie aufklappen, dann eine Spalte.
 2. Die gewünschten Werte ankreuzen. Mehrere Werte in derselben Spalte gelten als «oder», Filter in verschiedenen Spalten als «und».
@@ -65,18 +69,18 @@ Aktive Filter stehen oben als Kärtchen. Ein Klick auf **×** entfernt einen Fil
 
 Als Filter erscheinen nur Spalten mit 2 bis 150 verschiedenen Werten, zum Beispiel Leuchtentyp oder Leistung. Nach Nummern sucht man über die Suche.
 
-### 4.4 Suchen
+### 4.5 Suchen
 
 1. Im Feld **Suche (Strasse oder Lichtpunkt-Nr.)** einen Teil des Namens oder der Nummer eingeben, z. B. «Bahnhof» oder «LP-01».
 2. Unter dem Feld erscheinen die Treffer. Ein Klick auf einen Treffer zoomt auf die Leuchte, öffnet ihre Angaben und lässt sie kurz aufblinken.
 
 Gesucht wird in der Strasse und in allen drei Lichtpunkt-Nummern. Gross- und Kleinschreibung spielt keine Rolle.
 
-### 4.5 Tabelle
+### 4.6 Tabelle
 
 Die Ansicht **Tabelle** zeigt die gefilterten Leuchten mit allen Spalten und der Excel-Zeile. Ein Doppelklick auf eine Zeile springt zur Leuchte auf der Karte. Angezeigt werden höchstens 3'000 Zeilen. Bei mehr Leuchten mit Filter oder Suche eingrenzen.
 
-### 4.6 Nach Änderungen in Excel
+### 4.7 Nach Änderungen in Excel
 
 1. Die Änderung in Excel machen und **speichern**.
 2. In LumGis **Neu laden** klicken.
@@ -150,7 +154,7 @@ LumGis berechnet daraus Lage, Massstab und Drehung und meldet zum Beispiel «Aus
 **Arbeiten mit dem Plan**
 
 - Unten links: **Plan** ein- oder ausblenden, mit dem Regler die Transparenz einstellen, mit **weiss** einen weissen Planhintergrund einschalten.
-- Wählt man links eine Leuchte, deren Nummer im Plan beschriftet ist (z. B. «C-03.1»), springt die Karte zu dieser Beschriftung. Dann auf das Leuchtensymbol im Plan klicken.
+- Wählt man links eine Leuchte, deren Nummer im Plan beschriftet ist (z. B. «C-03.1»), springt die Karte zu dieser Beschriftung. Dafür vergleicht LumGis alle drei Nummern-Spalten mit den Texten im Plan. Dann auf das Leuchtensymbol im Plan klicken.
 - Die Ausrichtung bleibt gespeichert. Lädt man denselben Plan wieder, liegt er sofort richtig. Beim nächsten Öffnen der Excel-Datei bietet LumGis **Plan «…» wieder laden** an.
 - **Plan entfernen** nimmt den Plan von der Karte.
 

@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---|---|---|
 | Tech | single self-contained HTML, no install | Streamlit (Python) |
 | Source | `web/src/` → built by `web/build.py` | `archiv/streamlit/app.py` |
-| Status | in daily use (v1.2.0) | retired from daily use (Oct 2026); kept only as parity reference |
+| Status | in daily use (v1.2.1) | retired from daily use (Oct 2026); kept only as parity reference |
 
 **Never read or write anything on network drives (R:\, A:\).** Real test files are provided locally by the user (`testdaten/`, git-ignored). The user compares checksums on real files himself.
 
@@ -50,6 +50,7 @@ Text = `LumGis-Pruefsumme v1` line, tab-joined data column names, then per row (
 - `vendor/` — Leaflet 1.9.4, proj4js 2.15.0, SheetJS **0.20.3 mini** from cdn.sheetjs.com (npm 0.18.5 has CVEs), pdf.js **3.11.174** (classic script; worker script inlined as plain script → main-thread «fake worker», works under file://; `isEvalSupported: false` closes CVE-2024-4367). See `vendor/VENDOR.md`.
 - **Mode «Erfassen»** (capture, v1.1.0): only rows **without valid coordinates** can be placed (decision: office use on the aerial image, never move existing coordinates). Pick a row → click map → auto-advance to the next missing row (Excel order); orange draggable markers; existing points shown as white non-interactive context markers; Esc cancels. Positions converted with proj4js inverse (`core.toLV95`), rounded to cm, stored in localStorage `lumgis.capture.<file name>` (keyed by title|Excel row). On load/«Neu laden», positions whose row now has valid coordinates are dropped («übernommen»). Output: «Koordinatenliste speichern» = xlsx (Excel-Zeile, ID columns, Strasse, Koordinate X/Y; X = east or north detected from existing data). LumGis never writes to the inventory file.
 - Map fit after loading waits for a non-zero map size (`map.once('resize')`), otherwise fitBounds yields zoom 0 in hidden windows.
+- **Display name** (`rowTitle`, v1.2.1): selectable «Bezeichnung nach» (per file in localStorage `titleCol.<file>`), default «Lichtpunkt-Nr. neu» (holds the plan numbers); if empty, fallback neu → Projekt → Lichtpunkt-Nr. Capture items are keyed by Excel row (`Z<row>`) and store all three IDs, so switching the display column never loses positions; legacy items (`title|row`) are migrated by matching any ID. The Prüfbericht's duplicate check stays on `Lichtpunkt-Nr.` (parity with Python).
 - No data export, no editing (deliberate). All libraries inlined: works offline except map tiles.
 - Separate repo `gis_leuchten_koordinaten` (old GPS capture tool) stays in use for projects **without** an Lp inventory until the user decides otherwise.
 
